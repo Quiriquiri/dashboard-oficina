@@ -36,8 +36,19 @@ A coluna "Prazo" de todas as tabelas é editável: clica na data para escolher o
 limpar. A alteração é gravada de imediato no cartão do Trello (pedido `PUT` à API). Para isto
 funcionar, o token guardado no painel "Configurar chave/token" precisa de permissão de **escrita**
 — o link para gerar esse token (com `scope=read,write`) está explicado dentro do próprio painel.
-Um token só de leitura continua a mostrar os dados normalmente, só as alterações ao Prazo é que
-falham (aparece "Falha ao gravar" junto à data).
+Um token só de leitura continua a mostrar os dados normalmente, só as alterações falham (aparece
+"Falha ao gravar" junto ao campo).
+
+Junto ao Prazo há também um pequeno botão redondo ("○"/"✓") — é o **"Concluir"**: marca o cartão
+como tendo o prazo cumprido (`dueComplete` no Trello, o campo que efetivamente fecha o cartão).
+Clicar de novo desmarca (reabre).
+
+## Editar a data de Início diretamente no dashboard
+
+Nas tabelas que mostram a coluna "Início" (Metalomecânica e a secção "A decorrer" de cada oficina
+em A Decorrer Interno), a data funciona tal como o Prazo: clica para escolher outra, ou no "×" para
+limpar. Ao gravar, a coluna "Dias a decorrer" da mesma linha recalcula-se logo, sem precisar de
+recarregar a página.
 
 ## Editar etiquetas diretamente no dashboard
 
@@ -45,7 +56,27 @@ Na coluna "Etiquetas" de todas as tabelas há um botão "+" junto às etiquetas 
 clicar, abre um menu com todas as etiquetas existentes no board (caixa de checkboxes) — marcar ou
 desmarcar grava de imediato no Trello (o conjunto completo de etiquetas do cartão é substituído
 pelo que estiver marcado). O menu tem scroll interno quando há muitas etiquetas no board, para não
-ultrapassar o ecrã. Tal como o Prazo, isto precisa do token com permissão de **escrita**.
+ultrapassar o ecrã. Tal como o Prazo, isto precisa do token com permissão de **escrita**. Se um
+cartão mudar de etiqueta numa página agrupada por etiqueta (Planeamento Interno), ele muda logo de
+grupo para refletir a alteração.
+
+## Editar o cartão (nome, descrição, lista, membros, arquivar)
+
+Junto ao nome de cada cartão há um botão "✎" que abre uma janela com:
+
+- **Nome** e **Descrição** — texto livre, tal como no Trello.
+- **Lista (mover cartão)** — um menu com todas as listas do board; escolher uma diferente move o
+  cartão de imediato (por exemplo, passar de "Planeamento Interno" para "[Simão] Oficina Ligeiros"
+  quando o trabalho arranca — o cartão desaparece dessa página e passa a aparecer na secção "a
+  decorrer" correspondente).
+- **Início** — mesma data do ponto anterior, disponível aqui também para os cartões que ainda não
+  mostram essa coluna (fila de planeamento).
+- **Membros** — checkboxes com todas as pessoas do board; atribui quem for responsável pelo
+  trabalho.
+
+Tudo isto grava junto num só "Guardar alterações". Há ainda um botão separado **"Arquivar
+cartão"** (com confirmação) — o cartão deixa de aparecer no dashboard e nas listas ativas do
+Trello, mas não é apagado (continua acessível e recuperável a partir do próprio Trello).
 
 ## Coluna "Dias por planear"
 

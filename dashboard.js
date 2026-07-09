@@ -3,9 +3,10 @@
 // Config específica deste board (ver claude/trello-dashboard-config.md)
 // ---------------------------------------------------------------
 const BOARD_ID = 'cARsYBsY';
-const CARD_FIELDS = 'name,due,dueComplete,start,dateCompleted,dateLastActivity,closed,idList,labels,shortUrl,idShort';
+const CARD_FIELDS = 'name,desc,due,dueComplete,start,dateCompleted,dateLastActivity,closed,idList,idMembers,labels,shortUrl,idShort';
 const LIST_FIELDS = 'name,closed';
 const BOARD_LABEL_FIELDS = 'all'; // full label palette of the board, for the labels editor
+const BOARD_MEMBER_FIELDS = 'fullName,username'; // for the members editor
 const CACHE_KEY = 'trello_dash_cache_v2';
 const CACHE_TTL_MS = 3 * 60 * 1000; // 3 min: navegar entre páginas não repete o fetch
 
@@ -237,19 +238,33 @@ function cardRows(cards, opts) {
     let dueSort = NO_DATE_SORT, dueInputVal = '';
     if (c.due) { dueSort = c.due.substring(0, 10); dueInputVal = dueSort; }
     const overdueBadge = overdue ? '<span class="overdue-badge">atrasado</span>' : '';
+    const completeBtn = c.trelloId ? `<button type="button" class="due-complete-btn${c.dueComplete ? ' active' : ''}" data-trello-id="${esc(c.trelloId)}" title="${c.dueComplete ? 'Reabrir (desmarcar concluído)' : 'Marcar prazo como concluído'}">${c.dueComplete ? '✓' : '○'}</button>` : '';
     const dueCellHtml = c.trelloId ? `
       <input type="date" class="due-input" data-trello-id="${esc(c.trelloId)}" value="${dueInputVal}">
       <button type="button" class="due-clear" data-trello-id="${esc(c.trelloId)}" title="Limpar prazo">×</button>
+      ${completeBtn}
       <span class="due-status" data-status-for="${esc(c.trelloId)}"></span>
       ${overdueBadge}` : (c.due ? fmtDate(c.due) : '—');
-    const startCol = opts.showStart ? `<td data-sort="${c.start ? c.start.substring(0,10) : NO_DATE_SORT}">${fmtDate(c.start)}</td>` : '';
+    const startSort = c.start ? c.start.substring(0,10) : NO_DATE_SORT;
+    const startInputVal = c.start ? c.start.substring(0,10) : '';
+    const startCellHtml = c.trelloId ? `
+      <input type="date" class="start-input" data-trello-id="${esc(c.trelloId)}" value="${startInputVal}">
+      <button type="button" class="start-clear" data-trello-id="${esc(c.trelloId)}" title="Limpar início">×</button>
+      <span class="due-status" data-status-for="start-${esc(c.trelloId)}"></span>` : fmtDate(c.start);
+    const startCol = opts.showStart ? `<td class="start-cell" data-sort="${startSort}">${startCellHtml}</td>` : '';
     const createdCol = opts.showCreated ? `<td data-sort="${(c.created||'').substring(0,10) || NO_DATE_SORT}">${fmtDate(c.created)}</td>` : '';
     const runningCol = opts.showRunning ? runningDaysCell(c, now) : '';
     const labelsText = c.labels.map(l => l.name).join(', ');
     const labelsCellHtml = labelsEditableCell(c, opts.boardLabels);
+    const editBtn = c.trelloId ? `<button type="button" class="card-edit-btn" data-trello-id="${esc(c.trelloId)}" title="Editar cartão (nome, descrição, lista, membros, arquivar)">✎</button>` : '';
+    const memberNames = (c.idMembers || []).map(id => {
+      const m = (opts.boardMembers || []).find(x => x.id === id);
+      return m ? m.fullName : null;
+    }).filter(Boolean);
+    const membersLine = memberNames.length ? `<div class="card-members">${esc(memberNames.join(', '))}</div>` : '';
     return `<tr>
       <td class="col-id" data-sort="${c.id}">#${c.id}</td>
-      <td data-sort="${esc(c.name.toLowerCase())}"><a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.name)}</a></td>
+      <td data-sort="${esc(c.name.toLowerCase())}"><a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.name)}</a>${editBtn}${membersLine}</td>
       ${createdCol}${startCol}${runningCol}
       <td data-sort="${dueSort}" class="due-cell">${dueCellHtml}</td>
       <td data-sort="${esc(labelsText.toLowerCase())}" class="labels-cell">${labelsCellHtml}</td>
@@ -275,8 +290,8 @@ function processBoard(data, now) {
     const labels = (c.labels || []).filter(l => l.name).map(l => ({ name: l.name, color: l.color }));
     const labelIds = (c.labels || []).map(l => l.id); // unfiltered — includes unnamed labels, for the editor's checked state
     return {
-      id: c.idShort, trelloId: c.id, name: c.name, due: c.due, dueComplete: c.dueComplete,
-      start: c.start, created: createdFromId(c.id).toISOString(),
+      id: c.idShort, trelloId: c.id, name: c.name, desc: c.desc || '', due: c.due, dueComplete: c.dueComplete,
+      start: c.start, created: createdFromId(c.id).toISOString(), idList: c.idList, idMembers: c.idMembers || [],
       url: c.shortUrl, labels, labelIds, supplier: supplierOf(c.name),
     };
   }
@@ -319,10 +334,22 @@ function processBoard(data, now) {
   const monthlyAvgLast14 = monthlyAvgAll.slice(-14);
 
   const boardLabels = (data.labels || []).map(l => ({ id: l.id, name: l.name, color: l.color }));
+  const boardMembers = (data.members || []).map(m => ({ id: m.id, fullName: m.fullName || m.username || '(sem nome)' }));
+  const allLists = (data.lists || []).filter(l => !l.closed).map(l => ({ id: l.id, name: l.name }));
+
+  // flat index of every card object we produced, keyed by Trello id — used by the
+  // "editar cartão" modal to look up full details (desc, idList, idMembers, …) from just an id.
+  const cardsById = {};
+  [decorrerExterno, metalomecanica, planeamentoInterno,
+    ...workshops.flatMap(w => [w.decorrer, w.planeamento]),
+    ...pedreiras.map(p => p.cards)]
+    .flat()
+    .forEach(c => { cardsById[c.trelloId] = c; });
 
   return {
     boardName: data.name,
     decorrerExterno, metalomecanica, planeamentoInterno, workshops, pedreiras, boardLabels,
+    boardMembers, allLists, cardsById,
     resolution: { count: durations.length, mean, median, p90, monthlyAvgLast14 },
     totals: {
       totalOpen: cards.filter(c => !c.closed).length,
@@ -381,41 +408,73 @@ function wireSorting(root) {
 }
 
 // ---------------------------------------------------------------
-// Editable "Prazo" (due date) — writes straight back to the Trello card.
+// Core write path — every editable field (Prazo, Início, Etiquetas, Concluir,
+// Nome, Descrição, Lista, Membros, Arquivar) goes through this same pair of
+// functions: one PUT to the real Trello card endpoint, then (on success) a
+// patch of the locally-cached board JSON followed by a full in-place re-render
+// from that cache — no extra network round-trip, and it means every derived
+// view (which section a card sits in, sort order, label groupings, "dias a
+// decorrer") recomputes correctly instead of drifting out of sync.
 // Requires a token with write scope (see openCredsModal). Untested against the
 // live Trello API from the environment that built this (no network access there) —
 // if a save fails, the error shows inline; the card's own Trello link still works
-// as a fallback way to change the date.
+// as a fallback way to make the same change by hand.
 // ---------------------------------------------------------------
-async function updateCardDue(trelloId, isoDateOrNull, statusEl, cellEl) {
+async function patchTrelloCard(trelloId, fields, statusEl) {
   const { key, token } = getCreds();
-  if (!key || !token) { openCredsModal(); return; }
+  if (!key || !token) { openCredsModal(); return false; }
   if (statusEl) { statusEl.textContent = 'A gravar…'; statusEl.className = 'due-status saving'; }
   try {
-    const params = new URLSearchParams({ key, token, value: isoDateOrNull === null ? 'null' : isoDateOrNull });
-    const url = `https://api.trello.com/1/cards/${trelloId}/due?${params.toString()}`;
+    const params = new URLSearchParams({ key, token });
+    Object.keys(fields).forEach(k => {
+      let v = fields[k];
+      if (v === null || v === undefined) v = 'null';
+      else if (Array.isArray(v)) v = v.join(',');
+      else if (typeof v === 'boolean') v = v ? 'true' : 'false';
+      params.set(k, v);
+    });
+    const url = `https://api.trello.com/1/cards/${trelloId}?${params.toString()}`;
     const resp = await fetch(url, { method: 'PUT' });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    if (statusEl) {
-      statusEl.textContent = 'Guardado ✓';
-      statusEl.className = 'due-status ok';
-      setTimeout(() => { statusEl.textContent = ''; }, 2500);
-    }
-    if (cellEl) {
-      cellEl.dataset.sort = isoDateOrNull ? isoDateOrNull.substring(0, 10) : NO_DATE_SORT;
-      const badge = cellEl.querySelector('.overdue-badge');
-      if (badge) badge.remove();
-      if (isoDateOrNull) {
-        const overdue = new Date(isoDateOrNull) < new Date();
-        if (overdue) cellEl.insertAdjacentHTML('beforeend', '<span class="overdue-badge">atrasado</span>');
-      }
-    }
+    return true;
   } catch (err) {
     console.error(err);
     if (statusEl) { statusEl.textContent = 'Falha ao gravar'; statusEl.className = 'due-status err'; }
+    return false;
   }
 }
+function patchCachedCard(trelloId, fields) {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return;
+    const obj = JSON.parse(raw);
+    const card = (obj.data.cards || []).find(c => c.id === trelloId);
+    if (card) Object.assign(card, fields);
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify(obj));
+  } catch (e) { /* ignore — worst case the next full refresh catches up */ }
+}
+function rerenderFromCache() {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (!raw || !renderCallback) return;
+    const cached = JSON.parse(raw).data;
+    const now = new Date();
+    renderCallback(processBoard(cached, now), now);
+  } catch (e) { /* ignore */ }
+}
+// putFields: exact query params sent to Trello's PUT /1/cards/{id}.
+// cachePatch (optional): how to patch the locally-cached raw card object, when it
+// differs in shape from putFields (only "Etiquetas" needs this — Trello's write
+// param is idLabels, an id list, but the cached card stores full label objects).
+async function saveCardField(trelloId, putFields, statusEl, cachePatch) {
+  const ok = await patchTrelloCard(trelloId, putFields, statusEl);
+  if (ok) { patchCachedCard(trelloId, cachePatch || putFields); rerenderFromCache(); }
+  return ok;
+}
 
+// ---------------------------------------------------------------
+// Editable "Prazo" (due date) + "Concluir" toggle
+// ---------------------------------------------------------------
 function wireDueEditing(root) {
   const scope = root || document;
   scope.querySelectorAll('input.due-input').forEach(input => {
@@ -424,50 +483,56 @@ function wireDueEditing(root) {
       const cell = input.closest('td.due-cell');
       const statusEl = cell ? cell.querySelector('.due-status') : null;
       const iso = input.value ? new Date(input.value + 'T12:00:00Z').toISOString() : null;
-      updateCardDue(trelloId, iso, statusEl, cell);
+      saveCardField(trelloId, { due: iso }, statusEl);
     });
   });
   scope.querySelectorAll('button.due-clear').forEach(btn => {
     btn.addEventListener('click', () => {
       const trelloId = btn.dataset.trelloId;
       const cell = btn.closest('td.due-cell');
-      const input = cell ? cell.querySelector('input.due-input') : null;
       const statusEl = cell ? cell.querySelector('.due-status') : null;
-      if (input) input.value = '';
-      updateCardDue(trelloId, null, statusEl, cell);
+      saveCardField(trelloId, { due: null }, statusEl);
+    });
+  });
+  scope.querySelectorAll('button.due-complete-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const trelloId = btn.dataset.trelloId;
+      const cell = btn.closest('td.due-cell');
+      const statusEl = cell ? cell.querySelector('.due-status') : null;
+      const newVal = !btn.classList.contains('active');
+      saveCardField(trelloId, { dueComplete: newVal }, statusEl);
+    });
+  });
+}
+
+// ---------------------------------------------------------------
+// Editable "Início" (start date) — same shape as Prazo, own field on the card.
+// ---------------------------------------------------------------
+function wireStartEditing(root) {
+  const scope = root || document;
+  scope.querySelectorAll('input.start-input').forEach(input => {
+    input.addEventListener('change', () => {
+      const trelloId = input.dataset.trelloId;
+      const cell = input.closest('td.start-cell');
+      const statusEl = cell ? cell.querySelector('.due-status') : null;
+      const iso = input.value ? new Date(input.value + 'T12:00:00Z').toISOString() : null;
+      saveCardField(trelloId, { start: iso }, statusEl);
+    });
+  });
+  scope.querySelectorAll('button.start-clear').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const trelloId = btn.dataset.trelloId;
+      const cell = btn.closest('td.start-cell');
+      const statusEl = cell ? cell.querySelector('.due-status') : null;
+      saveCardField(trelloId, { start: null }, statusEl);
     });
   });
 }
 
 // ---------------------------------------------------------------
 // Editable "Etiquetas" (labels) — a popover with every board label as a checkbox;
-// each toggle replaces the card's full label set via a single PUT. Same untested
-// caveat as the due-date editor (no network to Trello from the build environment).
+// each toggle replaces the card's full label set via a single PUT.
 // ---------------------------------------------------------------
-async function updateCardLabels(trelloId, idLabelsArray, statusEl, chipsDisplayEl, boardLabels) {
-  const { key, token } = getCreds();
-  if (!key || !token) { openCredsModal(); return; }
-  if (statusEl) { statusEl.textContent = 'A gravar…'; statusEl.className = 'due-status saving'; }
-  try {
-    const params = new URLSearchParams({ key, token, idLabels: idLabelsArray.join(',') });
-    const url = `https://api.trello.com/1/cards/${trelloId}?${params.toString()}`;
-    const resp = await fetch(url, { method: 'PUT' });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    if (statusEl) {
-      statusEl.textContent = 'Guardado ✓';
-      statusEl.className = 'due-status ok';
-      setTimeout(() => { statusEl.textContent = ''; }, 2500);
-    }
-    if (chipsDisplayEl) {
-      const chosen = boardLabels.filter(l => idLabelsArray.includes(l.id));
-      chipsDisplayEl.innerHTML = chosen.map(labelChip).join('') || '<span class="chips-empty">—</span>';
-    }
-  } catch (err) {
-    console.error(err);
-    if (statusEl) { statusEl.textContent = 'Falha ao gravar'; statusEl.className = 'due-status err'; }
-  }
-}
-
 function wireLabelEditing(root, boardLabels) {
   const scope = root || document;
   scope.querySelectorAll('button.labels-edit-btn').forEach(btn => {
@@ -484,11 +549,10 @@ function wireLabelEditing(root, boardLabels) {
     cb.addEventListener('change', () => {
       const popover = cb.closest('.labels-popover');
       const trelloId = popover.dataset.trelloId;
-      const cell = popover.closest('td.labels-cell');
-      const chipsDisplayEl = cell ? cell.querySelector('.chips-display') : null;
       const statusEl = popover.querySelector('.due-status');
       const idLabelsArray = Array.from(popover.querySelectorAll('input[type="checkbox"]:checked')).map(i => i.value);
-      updateCardLabels(trelloId, idLabelsArray, statusEl, chipsDisplayEl, boardLabels);
+      const chosenLabelObjs = boardLabels.filter(l => idLabelsArray.includes(l.id));
+      saveCardField(trelloId, { idLabels: idLabelsArray }, statusEl, { labels: chosenLabelObjs });
     });
   });
   // close any open popover on an outside click
@@ -499,6 +563,83 @@ function wireLabelEditing(root, boardLabels) {
     });
     wireLabelEditing._outsideBound = true;
   }
+}
+
+// ---------------------------------------------------------------
+// "Editar cartão" modal — Nome, Descrição, Lista (mover cartão), Membros, e
+// Arquivar. Opened from the "✎" button next to the card name. All fields save
+// together in a single PUT when "Guardar alterações" is clicked.
+// ---------------------------------------------------------------
+function openCardEditModal(trelloId, P) {
+  const card = (P.cardsById || {})[trelloId];
+  if (!card) return;
+  const lists = P.allLists || [];
+  const members = P.boardMembers || [];
+  const listOptions = lists.map(l => `<option value="${esc(l.id)}" ${l.id === card.idList ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
+  const memberItems = members.length ? members.map(m => {
+    const checked = (card.idMembers || []).includes(m.id) ? 'checked' : '';
+    return `<label><input type="checkbox" value="${esc(m.id)}" ${checked}>${esc(m.fullName)}</label>`;
+  }).join('') : '<p class="info-note">Sem membros neste board.</p>';
+
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="modal-backdrop" id="cardBackdrop">
+      <div class="modal modal-wide">
+        <h3>Editar cartão</h3>
+        <p><a href="${esc(card.url)}" target="_blank" rel="noopener">Abrir no Trello ↗</a></p>
+        <label>Nome</label>
+        <input id="editName" type="text" value="${esc(card.name)}">
+        <label>Descrição</label>
+        <textarea id="editDesc">${esc(card.desc || '')}</textarea>
+        <label>Lista (mover cartão)</label>
+        <select id="editList">${listOptions}</select>
+        <label>Início</label>
+        <input id="editStart" type="date" value="${card.start ? card.start.substring(0,10) : ''}">
+        <label>Membros</label>
+        <div class="modal-checklist">${memberItems}</div>
+        <span class="due-status" id="cardEditStatus"></span>
+        <div class="row">
+          <button class="primary" id="btnSaveCard">Guardar alterações</button>
+          <button id="btnCancelCard">Cancelar</button>
+        </div>
+        <div class="archive-row">
+          <button id="btnArchiveCard" class="btn-danger">Arquivar cartão</button>
+          <p class="info-note">Deixa de aparecer no dashboard e nas listas ativas do Trello, mas não é apagado — continua acessível e pode ser restaurado a partir do Trello.</p>
+        </div>
+      </div>
+    </div>`;
+
+  const close = () => { document.getElementById('modalRoot').innerHTML = ''; };
+  document.getElementById('btnCancelCard').onclick = close;
+  document.getElementById('cardBackdrop').addEventListener('click', e => { if (e.target.id === 'cardBackdrop') close(); });
+
+  document.getElementById('btnSaveCard').onclick = async () => {
+    const statusEl = document.getElementById('cardEditStatus');
+    const name = document.getElementById('editName').value.trim();
+    if (!name) { statusEl.textContent = 'O nome não pode ficar vazio.'; statusEl.className = 'due-status err'; return; }
+    const desc = document.getElementById('editDesc').value;
+    const idList = document.getElementById('editList').value;
+    const startVal = document.getElementById('editStart').value;
+    const start = startVal ? new Date(startVal + 'T12:00:00Z').toISOString() : null;
+    const idMembers = Array.from(document.querySelectorAll('#modalRoot .modal-checklist input:checked')).map(i => i.value);
+    const ok = await saveCardField(trelloId, { name, desc, idList, start, idMembers }, statusEl);
+    if (ok) close();
+  };
+  document.getElementById('btnArchiveCard').onclick = async () => {
+    if (!confirm('Arquivar este cartão? Deixa de aparecer nas listas ativas (não é apagado — dá para restaurar no Trello).')) return;
+    const statusEl = document.getElementById('cardEditStatus');
+    const ok = await saveCardField(trelloId, { closed: true }, statusEl);
+    if (ok) close();
+  };
+}
+
+function wireCardEditing(root, P) {
+  const scope = root || document;
+  scope.querySelectorAll('button.card-edit-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openCardEditModal(btn.dataset.trelloId, P);
+    });
+  });
 }
 
 // ---------------------------------------------------------------
@@ -543,7 +684,7 @@ async function fetchAndRender(force) {
   }
   setStatus('', 'A atualizar…');
   try {
-    const url = `https://api.trello.com/1/boards/${BOARD_ID}?fields=name,url&lists=all&list_fields=${LIST_FIELDS}&cards=all&card_fields=${CARD_FIELDS}&labels=all&label_fields=${BOARD_LABEL_FIELDS}&key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
+    const url = `https://api.trello.com/1/boards/${BOARD_ID}?fields=name,url&lists=all&list_fields=${LIST_FIELDS}&cards=all&card_fields=${CARD_FIELDS}&labels=all&label_fields=${BOARD_LABEL_FIELDS}&members=all&member_fields=${BOARD_MEMBER_FIELDS}&key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
     const resp = await fetch(url);
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
@@ -565,9 +706,9 @@ function openCredsModal() {
       <div class="modal">
         <h3>Ligar ao Trello</h3>
         <p>A key e o token ficam guardados só neste browser (localStorage), partilhados entre todas as páginas deste site, nunca enviados para mais lado nenhum além da API do Trello. Obtém a key em <a href="https://trello.com/power-ups/admin/api-key" target="_blank" rel="noopener">trello.com/power-ups/admin/api-key</a>.</p>
-        <p><strong>Para poder editar o Prazo</strong>, o token precisa de permissão de escrita — gera-o com este link (substitui SUA_API_KEY pela key acima): <br>
+        <p><strong>Para poder editar cartões</strong> (Prazo, Início, Concluir, Etiquetas, Nome, Descrição, mover de lista, Membros, Arquivar), o token precisa de permissão de escrita — gera-o com este link (substitui SUA_API_KEY pela key acima): <br>
         <code style="font-size:10px; word-break:break-all;">https://trello.com/1/authorize?expiration=30days&scope=read,write&response_type=token&key=SUA_API_KEY</code><br>
-        Um token só de leitura (scope=read) continua a mostrar os dados, mas as alterações ao Prazo falham.</p>
+        Um token só de leitura (scope=read) continua a mostrar os dados, mas qualquer alteração falha.</p>
         <label>API Key</label>
         <input id="inpKey" type="text" value="${esc(key)}" placeholder="a tua API key">
         <label>Token</label>
@@ -616,7 +757,9 @@ function initPage(activeKey, render) {
     const contentEl = document.getElementById('content');
     wireSorting(contentEl);
     wireDueEditing(contentEl);
+    wireStartEditing(contentEl);
     wireLabelEditing(contentEl, P.boardLabels || []);
+    wireCardEditing(contentEl, P);
   };
   document.getElementById('btnUpdate').addEventListener('click', () => fetchAndRender(true));
   document.getElementById('btnCreds').addEventListener('click', openCredsModal);

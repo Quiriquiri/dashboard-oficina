@@ -26,7 +26,7 @@ function render(P, now) {
       <p class="desc">${cards.length} cartões atualmente em curso · lista "Intervenções Externas DECORRER" · "Dias a decorrer" conta desde a data de início (ou, se não preenchida, desde a criação do cartão — assinalado com *)</p>
       <p class="info-note" style="margin-top:0;margin-bottom:10px;">Cartões por fornecedor (extraído do texto entre [] no início do nome do cartão):</p>
       ${hbarChart(supplierData, CAT_BLUE, {width:720, barH:16, gap:10})}
-      <div style="margin-top:18px;">${cardTable(cards, {showStart:true, showRunning:true, now, boardLabels:P.boardLabels})}</div>
+      <div style="margin-top:18px;">${cardTable(cards, {showStart:true, showRunning:true, now, boardLabels:P.boardLabels, boardMembers:P.boardMembers})}</div>
     </section>
   `;
 }

@@ -78,6 +78,23 @@ button.due-clear:hover { color: var(--critical); }
 .overdue-badge { display: inline-block; font-size: 10px; font-weight: 600; color: var(--critical);
   background: color-mix(in srgb, var(--critical) 14%, transparent); border-radius: 999px; padding: 2px 7px; margin-left: 4px; }
 .approx { color: var(--text-muted); }
+button.due-complete-btn { appearance: none; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-muted);
+  border-radius: 999px; width: 18px; height: 18px; line-height: 1; font-size: 11px; cursor: pointer; margin-left: 4px; vertical-align: middle; }
+button.due-complete-btn:hover { border-color: var(--good); color: var(--good); }
+button.due-complete-btn.active { background: var(--good); border-color: var(--good); color: #fff; }
+
+td.start-cell { white-space: nowrap; }
+input.start-input { font: inherit; font-size: 12px; color: var(--text-primary); background: transparent;
+  border: 1px solid transparent; border-radius: 6px; padding: 3px 4px; width: 110px; cursor: pointer; }
+input.start-input:hover, input.start-input:focus { border-color: var(--border); background: var(--surface-2); cursor: text; }
+button.start-clear { appearance: none; border: none; background: none; color: var(--text-muted); cursor: pointer;
+  font-size: 14px; line-height: 1; padding: 2px 4px; vertical-align: middle; }
+button.start-clear:hover { color: var(--critical); }
+
+button.card-edit-btn { appearance: none; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-secondary);
+  border-radius: 999px; width: 18px; height: 18px; line-height: 1; font-size: 11px; cursor: pointer; margin-left: 6px; vertical-align: middle; }
+button.card-edit-btn:hover { color: var(--series-1); border-color: var(--series-1); }
+.card-members { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .chip { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--chip) 16%, transparent); color: var(--text-primary); border: 1px solid color-mix(in srgb, var(--chip) 55%, transparent); margin: 1px 3px 1px 0; }
 .chips-empty { color: var(--text-muted); }
 
@@ -119,15 +136,23 @@ details.tbl-toggle summary { cursor: pointer; font-size: 12px; color: var(--text
 footer.note { font-size: 11px; color: var(--text-muted); margin-top: 30px; line-height: 1.5; }
 .info-note { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
 
-.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
-.modal { background: var(--surface-2); border-radius: 12px; padding: 24px; max-width: 460px; width: 100%; border: 1px solid var(--border); }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; overflow-y: auto; }
+.modal { background: var(--surface-2); border-radius: 12px; padding: 24px; max-width: 460px; width: 100%; border: 1px solid var(--border); margin: auto; }
+.modal.modal-wide { max-width: 560px; }
 .modal h3 { margin: 0 0 6px; font-size: 16px; }
 .modal p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
 .modal label { display: block; font-size: 12px; font-weight: 600; margin: 12px 0 4px; }
-.modal input, .modal textarea { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--page-plane); color: var(--text-primary); font-size: 13px; font-family: inherit; }
+.modal input, .modal textarea, .modal select { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--page-plane); color: var(--text-primary); font-size: 13px; font-family: inherit; }
 .modal textarea { min-height: 90px; resize: vertical; }
 .modal .row { display: flex; gap: 8px; margin-top: 18px; }
 .modal .row button { flex: 1; }
+.modal-checklist { max-height: 160px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+.modal-checklist label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 400; margin: 0; padding: 4px 2px; }
+.modal-checklist label input { width: auto; margin: 0; }
+.archive-row { margin-top: 18px; border-top: 1px solid var(--grid-line); padding-top: 14px; }
+button.btn-danger { appearance: none; border: 1px solid var(--critical); background: var(--surface-2); color: var(--critical);
+  border-radius: 8px; padding: 7px 12px; font-size: 13px; cursor: pointer; font-weight: 600; }
+button.btn-danger:hover { background: color-mix(in srgb, var(--critical) 12%, transparent); }
 .hint { font-size: 11px; color: var(--text-muted); margin-top: 14px; border-top: 1px solid var(--grid-line); padding-top: 10px; }
 .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
 .subgroup-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--text-muted); margin: 18px 0 8px; }
