@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Oficina — Pedreiras</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap"><div id="app"></div></div>
+<script src="dashboard.js"></script>
+<script>
+function render(P, now) {
+  const total = P.pedreiras.reduce((s, p) => s + p.cards.length, 0);
+  const chartData = P.pedreiras.map(p => [p.label, p.cards.length]);
+  const sections = P.pedreiras.filter(p => p.cards.length).map(p => `
+    <div class="site-block" id="${p.key}">
+      <h3>${esc(p.label)} (${p.cards.length})</h3>
+      ${cardTable(p.cards, {now})}
+    </div>`).join('');
+
+  document.getElementById('content').innerHTML = `
+    <div class="kpi-row">
+      <div class="stat-tile"><div class="label">Cartões pendentes</div><div class="value">${total}</div></div>
+      <div class="stat-tile"><div class="label">Pedreiras ativas</div><div class="value">${P.pedreiras.filter(p=>p.cards.length).length}</div></div>
+    </div>
+    <section class="card">
+      <h2>Serviços Pendentes em Pedreiras</h2>
+      <p class="desc">${total} cartões pendentes em obra, por pedreira</p>
+      ${hbarChart(chartData, CAT_BLUE, {barH:20, gap:16})}
+      ${sections}
+    </section>
+  `;
+  if (location.hash) {
+    const el = document.querySelector(location.hash);
+    if (el) el.scrollIntoView();
+  }
+}
+initPage('pedreiras', render);
+</script>
+</body>
+</html>

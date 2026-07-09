@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Oficina — Planeamento Interno</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap"><div id="app"></div></div>
+<script src="dashboard.js"></script>
+<script>
+function render(P, now) {
+  const cards = P.planeamentoInterno;
+  const labelGroups = {};
+  cards.forEach(c => {
+    const names = c.labels.length ? c.labels.map(l => l.name) : ['(sem etiqueta)'];
+    names.forEach(n => { (labelGroups[n] = labelGroups[n] || []).push(c); });
+  });
+  const orderedLabels = Object.keys(labelGroups).sort((a, b) => {
+    if (a === '(sem etiqueta)') return 1;
+    if (b === '(sem etiqueta)') return -1;
+    return labelGroups[b].length - labelGroups[a].length;
+  });
+  function labelColorFor(name) {
+    for (const c of cards) for (const l of c.labels) if (l.name === name) return LABEL_COLOR_MAP[l.color] || '#c3c2b7';
+    return '#c3c2b7';
+  }
+  const groupsHtml = orderedLabels.map(lname => {
+    const groupCards = labelGroups[lname].slice().sort((a,b) => {
+      const av = a.due === null ? 1 : 0, bv = b.due === null ? 1 : 0;
+      if (av !== bv) return av - bv;
+      return (a.due||'').localeCompare(b.due||'');
+    });
+    const color = lname === '(sem etiqueta)' ? '#c3c2b7' : labelColorFor(lname);
+    return `
+      <div class="label-group" id="${slug(lname)}">
+        <h3><span class="dot" style="--chip:${color}"></span>${esc(lname)} <span class="count">(${groupCards.length})</span></h3>
+        ${cardTable(groupCards, {showCreated:true, sortByDue:false, now})}
+      </div>`;
+  }).join('');
+
+  document.getElementById('content').innerHTML = `
+    <div class="kpi-row">
+      <div class="stat-tile"><div class="label">Cartões a distribuir</div><div class="value">${cards.length}</div></div>
+      <div class="stat-tile"><div class="label">Grupos (etiquetas)</div><div class="value">${orderedLabels.length}</div></div>
+    </div>
+    <section class="card">
+      <h2>Planeamento Interno — trabalhos a distribuir</h2>
+      <p class="desc">${cards.length} cartões na lista "Planeamento Interno", agrupados por etiqueta (um cartão com várias etiquetas aparece em cada grupo correspondente) e ordenados por prazo dentro de cada grupo</p>
+      ${groupsHtml}
+    </section>
+  `;
+  if (location.hash) {
+    const el = document.querySelector(location.hash);
+    if (el) el.scrollIntoView();
+  }
+}
+initPage('planeamento-interno', render);
+</script>
+</body>
+</html>

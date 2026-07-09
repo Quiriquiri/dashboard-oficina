@@ -3,699 +3,102 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dashboard Oficina — Trello (ao vivo)</title>
-<style>
-:root {
-  --surface-1: #fcfcfb; --surface-2: #ffffff; --page-plane: #f9f9f7;
-  --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #898781;
-  --grid-line: #e1e0d9; --baseline: #c3c2b7; --border: rgba(11,11,11,0.10);
-  --series-1: #2a78d6; --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --surface-1: #1a1a19; --surface-2: #212120; --page-plane: #0d0d0d;
-    --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #898781;
-    --grid-line: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
-    --series-1: #3987e5; --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #e66767;
-  }
-}
-* { box-sizing: border-box; }
-body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--page-plane); color: var(--text-primary); }
-.wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 80px; }
-header.top h1 { font-size: 22px; margin: 0 0 4px; }
-header.top p { margin: 0; color: var(--text-secondary); font-size: 13px; }
-
-.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 16px 0 8px;
-  background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
-.toolbar .status { font-size: 12px; color: var(--text-secondary); margin-right: auto; }
-.toolbar button { appearance: none; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-primary);
-  border-radius: 8px; padding: 7px 12px; font-size: 13px; cursor: pointer; font-weight: 600; }
-.toolbar button.primary { background: var(--series-1); color: #fff; border-color: var(--series-1); }
-.toolbar button:hover { filter: brightness(0.97); }
-.dot-live { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; background: var(--text-muted); }
-.dot-live.ok { background: var(--good); }
-.dot-live.err { background: var(--critical); }
-
-nav.tabs { display: flex; gap: 4px; margin: 20px 0 24px; border-bottom: 1px solid var(--grid-line); }
-nav.tabs button.tabbtn { appearance: none; border: none; background: none; cursor: pointer; padding: 10px 16px; font-size: 14px; font-weight: 600; color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -1px; }
-nav.tabs button.tabbtn.active { color: var(--series-1); border-bottom-color: var(--series-1); }
-
-.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 28px; }
-.stat-tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
-.stat-tile .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
-.stat-tile .value { font-size: 26px; font-weight: 600; line-height: 1; }
-.stat-tile .sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
-
-section.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; margin-bottom: 20px; }
-section.card h2 { font-size: 16px; margin: 0 0 2px; }
-section.card .desc { font-size: 12px; color: var(--text-secondary); margin: 0 0 16px; }
-
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .02em; color: var(--text-muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--grid-line); white-space: nowrap; cursor: pointer; user-select: none; }
-table th:hover { color: var(--text-secondary); }
-table th::after { content: ''; opacity: .35; margin-left: 4px; font-size: 10px; }
-table th.sort-asc::after { content: '▲'; opacity: 1; color: var(--series-1); }
-table th.sort-desc::after { content: '▼'; opacity: 1; color: var(--series-1); }
-table td { padding: 8px 8px; border-bottom: 1px solid var(--grid-line); color: var(--text-primary); vertical-align: top; }
-table tr:last-child td { border-bottom: none; }
-table a { color: var(--text-primary); text-decoration: none; }
-table a:hover { color: var(--series-1); text-decoration: underline; }
-.col-id { color: var(--text-muted); white-space: nowrap; }
-.overdue { color: var(--critical); font-weight: 600; }
-.days-warning { color: #a06a00; font-weight: 600; }
-.days-critical { color: var(--critical); font-weight: 600; }
-@media (prefers-color-scheme: dark) { .days-warning { color: var(--warning); } }
-.approx { color: var(--text-muted); }
-.chip { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--chip) 16%, transparent); color: var(--text-primary); border: 1px solid color-mix(in srgb, var(--chip) 55%, transparent); margin: 1px 3px 1px 0; }
-.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--chip); margin-right: 7px; }
-.bar-label { font-size: 12px; fill: var(--text-secondary); }
-.bar-value { font-size: 12px; fill: var(--text-primary); font-weight: 600; }
-.bar-track { fill: var(--grid-line); }
-.axis-label { font-size: 10px; fill: var(--text-muted); }
-.grid-line { stroke: var(--grid-line); stroke-width: 1; }
-.area-fill { fill: var(--series-1); opacity: .10; }
-.line-path { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.line-dot { fill: var(--series-1); stroke: var(--surface-1); stroke-width: 2; }
-.line-end-label { font-size: 12px; fill: var(--text-primary); font-weight: 600; }
-.site-block { margin-bottom: 18px; }
-.site-block h3 { font-size: 13px; margin: 0 0 6px; color: var(--text-secondary); }
-.label-group { margin-bottom: 22px; }
-.label-group h3 { font-size: 13px; margin: 0 0 8px; display: flex; align-items: center; }
-.label-group .count { color: var(--text-muted); font-weight: 400; margin-left: 4px; }
-details.tbl-toggle summary { cursor: pointer; font-size: 12px; color: var(--text-secondary); margin-top: 10px; }
-footer.note { font-size: 11px; color: var(--text-muted); margin-top: 30px; line-height: 1.5; }
-.info-note { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
-
-.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
-.modal { background: var(--surface-2); border-radius: 12px; padding: 24px; max-width: 460px; width: 100%; border: 1px solid var(--border); }
-.modal h3 { margin: 0 0 6px; font-size: 16px; }
-.modal p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
-.modal label { display: block; font-size: 12px; font-weight: 600; margin: 12px 0 4px; }
-.modal input, .modal textarea { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--page-plane); color: var(--text-primary); font-size: 13px; font-family: inherit; }
-.modal textarea { min-height: 90px; resize: vertical; }
-.modal .row { display: flex; gap: 8px; margin-top: 18px; }
-.modal .row button { flex: 1; }
-.hint { font-size: 11px; color: var(--text-muted); margin-top: 14px; border-top: 1px solid var(--grid-line); padding-top: 10px; }
-.empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
-</style>
+<title>Dashboard Oficina — Visão Geral</title>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <h1>Dashboard Oficina — Trello</h1>
-    <p>Liga-se diretamente à API do Trello a partir deste browser · atualiza sempre que abrires a página ou clicares em "Atualizar agora"</p>
-  </header>
-
-  <div class="toolbar">
-    <span class="status" id="status"><span class="dot-live" id="statusDot"></span><span id="statusText">Por configurar</span></span>
-    <button id="btnUpdate">Atualizar agora</button>
-    <button id="btnCreds">Configurar chave/token</button>
-  </div>
-
-  <div id="content"></div>
-</div>
-
-<div id="modalRoot"></div>
-
+<div class="wrap"><div id="app"></div></div>
+<script src="dashboard.js"></script>
 <script>
-// ---------------------------------------------------------------
-// Config — específico deste board (ver claude/trello-dashboard-config.md)
-// ---------------------------------------------------------------
-const BOARD_ID = 'cARsYBsY';
-const CARD_FIELDS = 'name,due,dueComplete,start,dateCompleted,dateLastActivity,closed,idList,labels,shortUrl,idShort';
-const LIST_FIELDS = 'name,closed';
-
-const DECORRER_EXTERNO_IDS = ['60a8c2a0596fa845c5933750'];
-const DECORRER_INTERNO = {
-  '60a8c5ef3f12b62525ccc4ab': 'Camiões',
-  '62868683568a3677ae4bb713': 'Máquinas',
-  '6196240bd300b95eb1129aee': 'Ligeiros',
-};
-const WS_ORDER = ['Ligeiros', 'Camiões', 'Máquinas'];
-const PEDREIRAS = {
-  '6a0c284437d45147d95b8fea': 'Cano',
-  '6a0c284d209cb40da1afaebf': 'Sta. Eulália',
-  '6a0c2868699fe4f8e4b6cb2b': 'Moleanos',
-  '6a0c285843cfce5f39e85732': 'Moita do Poço',
-  '6a0c2860c57258c4617fb31d': 'Sobrissul',
-};
-const PEDREIRAS_ORDER = ['Sta. Eulália', 'Sobrissul', 'Cano', 'Moleanos', 'Moita do Poço'];
-const METALOMECANICA_IDS = ['63bff836db7783031479dafa'];
-const PLANEAMENTO_INTERNO_IDS = ['6279144293e6b5285eb588fc'];
-
-const CAT_BLUE = '#2a78d6', CAT_AQUA = '#1baf7a', CAT_YELLOW = '#eda100';
-const LABEL_COLOR_MAP = {
-  lime: '#0ca30c', orange: '#eb6834', orange_dark: '#d95926',
-  purple_dark: '#4a3aa7', red: '#d03b3b', yellow: '#eda100',
-  blue: '#2a78d6', sky: '#1baf7a', green: '#008300', green_dark: '#008300',
-  pink: '#e87ba4', black: '#52514e', grey: '#898781', none: '#c3c2b7',
-};
-const MONTH_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-const NO_DATE_SORT = '9999-12-31';
-
-// ---------------------------------------------------------------
-// Storage helpers
-// ---------------------------------------------------------------
-function getCreds() {
-  return { key: localStorage.getItem('trello_dash_key') || '', token: localStorage.getItem('trello_dash_token') || '' };
-}
-function setCreds(key, token) {
-  localStorage.setItem('trello_dash_key', key);
-  localStorage.setItem('trello_dash_token', token);
-}
-function clearCreds() {
-  localStorage.removeItem('trello_dash_key');
-  localStorage.removeItem('trello_dash_token');
-}
-
-// ---------------------------------------------------------------
-// Utils (mirroring the original Python generator)
-// ---------------------------------------------------------------
-function esc(s) {
-  if (s === null || s === undefined) return '';
-  const d = document.createElement('div');
-  d.textContent = String(s);
-  return d.innerHTML;
-}
-function parseDt(iso) { return iso ? new Date(iso) : null; }
-function fmtDate(iso) {
-  const dt = parseDt(iso);
-  if (!dt) return '—';
-  const p = n => String(n).padStart(2, '0');
-  return `${p(dt.getUTCDate())}/${p(dt.getUTCMonth() + 1)}/${dt.getUTCFullYear()}`;
-}
-function daysUntil(iso, now) {
-  const dt = parseDt(iso);
-  if (!dt) return null;
-  return Math.floor((dt - now) / 86400000);
-}
-function createdFromId(id) {
-  const ts = parseInt(id.substring(0, 8), 16);
-  return new Date(ts * 1000);
-}
-function isDivider(name) {
-  return /^[▼▲►◄].*[▼▲►◄]$/.test(name.trim());
-}
-function supplierOf(name) {
-  const m = /^\[([^\]]+)\]/.exec(name.trim());
-  return m ? m[1].trim() : null;
-}
-function daysRunning(card, now) {
-  const base = card.start || card.created;
-  const dt = parseDt(base);
-  if (!dt) return { rd: null, real: false };
-  return { rd: Math.floor((now - dt) / 86400000), real: !!card.start };
-}
-
-// ---------------------------------------------------------------
-// Chart builders (SVG strings) — same specs as the static version
-// ---------------------------------------------------------------
-function hbarChart(data, colors, opts) {
-  opts = opts || {};
-  const width = opts.width || 560, barH = opts.barH || 20, gap = opts.gap || 14;
-  const maxV = Math.max(1, ...data.map(d => d[1]));
-  const labelW = 150, plotW = width - labelW - 46, rowH = barH + gap;
-  const height = rowH * data.length + 8;
-  let rows = '';
-  data.forEach(([label, v], i) => {
-    const y = i * rowH + 8;
-    const w = Math.max(2, plotW * v / maxV);
-    const color = Array.isArray(colors) ? colors[i] : colors;
-    rows += `
-      <text x="${labelW - 10}" y="${y + barH / 2 + 4}" text-anchor="end" class="bar-label">${esc(label)}</text>
-      <rect x="${labelW}" y="${y}" width="${plotW}" height="${barH}" class="bar-track"/>
-      <rect x="${labelW}" y="${y}" width="${w.toFixed(1)}" height="${barH}" rx="4" class="bar-fill" style="fill:${color}"/>
-      <text x="${(labelW + w + 8).toFixed(1)}" y="${y + barH / 2 + 4}" class="bar-value">${v}</text>`;
-  });
-  return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="gráfico de barras">${rows}</svg>`;
-}
-
-function lineChart(points, opts) {
-  opts = opts || {};
-  const width = opts.width || 760, height = opts.height || 220, unit = opts.unit || 'dias';
-  const padL = 36, padR = 16, padT = 20, padB = 28;
-  const plotW = width - padL - padR, plotH = height - padT - padB;
-  const vals = points.map(p => p[1]);
-  const rawMax = Math.max(...vals) * 1.15;
-  const stepUnit = rawMax <= 40 ? 5 : (rawMax <= 100 ? 10 : 25);
-  const maxV = (Math.floor(rawMax / stepUnit) + 1) * stepUnit;
-  const n = points.length;
-  const step = n > 1 ? plotW / (n - 1) : 0;
-  const xy = (i, v) => [padL + step * i, padT + plotH - (v / maxV) * plotH];
-  const coords = points.map((p, i) => xy(i, p[1]));
-  const pathD = 'M ' + coords.map(c => `${c[0].toFixed(1)} ${c[1].toFixed(1)}`).join(' L ');
-  const areaD = pathD + ` L ${coords[n-1][0].toFixed(1)} ${(padT+plotH).toFixed(1)} L ${coords[0][0].toFixed(1)} ${(padT+plotH).toFixed(1)} Z`;
-  let grid = '';
-  for (let g = 0; g <= 4; g++) {
-    const gy = padT + plotH - (g / 4) * plotH;
-    const gval = Math.round((maxV) * g / 4);
-    grid += `<line x1="${padL}" y1="${gy.toFixed(1)}" x2="${width - padR}" y2="${gy.toFixed(1)}" class="grid-line"/>`;
-    grid += `<text x="${padL - 8}" y="${(gy+3).toFixed(1)}" text-anchor="end" class="axis-label">${gval}</text>`;
-  }
-  let xlabels = '';
-  points.forEach((p, i) => {
-    if (i % 2 === 0 || i === n - 1) {
-      xlabels += `<text x="${coords[i][0].toFixed(1)}" y="${height - 8}" text-anchor="middle" class="axis-label">${esc(p[0])}</text>`;
-    }
-  });
-  let dots = '';
-  coords.forEach((c, i) => {
-    const isLast = i === n - 1;
-    const r = isLast ? 5 : 4;
-    dots += `<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="${r}" class="line-dot"><title>${esc(points[i][0])}: ${points[i][1]} ${unit}</title></circle>`;
-  });
-  const endLabel = `<text x="${coords[n-1][0].toFixed(1)}" y="${(coords[n-1][1]-12).toFixed(1)}" text-anchor="end" class="line-end-label">${points[n-1][1]} ${unit}</text>`;
-  return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="tendência">
-    ${grid}<path d="${areaD}" class="area-fill"/><path d="${pathD}" class="line-path"/>${dots}${endLabel}${xlabels}</svg>`;
-}
-
-// ---------------------------------------------------------------
-// Table builders
-// ---------------------------------------------------------------
-function labelChip(l) {
-  if (!l.name) return '';
-  const hexc = LABEL_COLOR_MAP[l.color] || '#c3c2b7';
-  return `<span class="chip" style="--chip:${hexc}">${esc(l.name)}</span>`;
-}
-function runningDaysCell(card, now) {
-  const { rd, real } = daysRunning(card, now);
-  if (rd === null) return '<td data-sort="-1">—</td>';
-  let cls = '';
-  if (rd >= 60) cls = ' class="days-critical"';
-  else if (rd >= 30) cls = ' class="days-warning"';
-  const tag = real ? '' : '<span class="approx">*</span>';
-  return `<td data-sort="${rd}"${cls}>${rd}d${tag}</td>`;
-}
-function tableHeader({ showStart, showCreated, showRunning } = {}) {
-  let cols = [['Nº', 'num'], ['Cartão', 'text']];
-  if (showCreated) cols.push(['Criado em', 'text']);
-  if (showStart) cols.push(['Início', 'text']);
-  if (showRunning) cols.push(['Dias a decorrer', 'num']);
-  cols.push(['Prazo', 'text'], ['Etiquetas', 'text']);
-  return '<tr>' + cols.map(([c, t]) => `<th data-type="${t}">${c}</th>`).join('') + '</tr>';
-}
-function cardRows(cards, opts) {
-  opts = opts || {};
-  const now = opts.now;
-  let items = cards.slice();
-  if (opts.sortByDue !== false) {
-    items.sort((a, b) => {
-      const av = a.due === null ? 1 : 0, bv = b.due === null ? 1 : 0;
-      if (av !== bv) return av - bv;
-      return (a.due || '').localeCompare(b.due || '');
-    });
-  }
-  return items.map(c => {
-    let overdue = false;
-    if (c.due && !c.dueComplete) {
-      const dleft = daysUntil(c.due, now);
-      overdue = dleft !== null && dleft < 0;
-    }
-    let dueHtml = '—', dueSort = NO_DATE_SORT;
-    if (c.due) {
-      const d = fmtDate(c.due);
-      dueHtml = overdue ? `<span class="overdue">${d} · atrasado</span>` : d;
-      dueSort = c.due.substring(0, 10);
-    }
-    const startCol = opts.showStart ? `<td data-sort="${c.start ? c.start.substring(0,10) : NO_DATE_SORT}">${fmtDate(c.start)}</td>` : '';
-    const createdCol = opts.showCreated ? `<td data-sort="${(c.created||'').substring(0,10) || NO_DATE_SORT}">${fmtDate(c.created)}</td>` : '';
-    const runningCol = opts.showRunning ? runningDaysCell(c, now) : '';
-    const labelsText = c.labels.map(l => l.name).join(', ');
-    const labelsHtml = c.labels.map(labelChip).join('');
-    return `<tr>
-      <td class="col-id" data-sort="${c.id}">#${c.id}</td>
-      <td data-sort="${esc(c.name.toLowerCase())}"><a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.name)}</a></td>
-      ${createdCol}${startCol}${runningCol}
-      <td data-sort="${dueSort}">${dueHtml}</td>
-      <td data-sort="${esc(labelsText.toLowerCase())}">${labelsHtml}</td>
-    </tr>`;
-  }).join('\n');
-}
-
-// ---------------------------------------------------------------
-// Process raw Trello board JSON into the shape the renderer needs
-// ---------------------------------------------------------------
-function processBoard(data, now) {
-  const lists = {};
-  (data.lists || []).forEach(l => { lists[l.id] = l.name; });
-  const cards = data.cards || [];
-
-  function cardBrief(c) {
-    const labels = (c.labels || []).filter(l => l.name).map(l => ({ name: l.name, color: l.color }));
-    return {
-      id: c.idShort, name: c.name, due: c.due, dueComplete: c.dueComplete,
-      start: c.start, created: createdFromId(c.id).toISOString(),
-      url: c.shortUrl, labels, list: lists[c.idList], supplier: supplierOf(c.name),
-    };
-  }
-  function openCardsIn(listIds) {
-    return cards.filter(c => listIds.includes(c.idList) && !c.closed && !isDivider(c.name)).map(cardBrief);
-  }
-
-  const decorrerExterno = openCardsIn(DECORRER_EXTERNO_IDS);
-  const decorrerInternoByWs = {};
-  Object.entries(DECORRER_INTERNO).forEach(([id, name]) => { decorrerInternoByWs[name] = openCardsIn([id]); });
-  const metalomecanica = openCardsIn(METALOMECANICA_IDS);
-  const planeamentoInterno = openCardsIn(PLANEAMENTO_INTERNO_IDS);
-  const pedreirasBySite = {};
-  Object.entries(PEDREIRAS).forEach(([id, site]) => { pedreirasBySite[site] = openCardsIn([id]); });
-
-  // resolution stats — over ALL cards on the board with both start & dateCompleted
-  const durations = [];
-  const monthly = {};
-  cards.forEach(c => {
-    const s = parseDt(c.start), dc = parseDt(c.dateCompleted);
-    if (s && dc && dc > s) {
-      const d = (dc - s) / 86400000;
-      durations.push(d);
-      const key = `${dc.getUTCFullYear()}-${String(dc.getUTCMonth()+1).padStart(2,'0')}`;
-      (monthly[key] = monthly[key] || []).push(d);
-    }
-  });
-  durations.sort((a, b) => a - b);
-  const mean = durations.reduce((a, b) => a + b, 0) / (durations.length || 1);
-  const mid = Math.floor(durations.length / 2);
-  const median = durations.length % 2 ? durations[mid] : (durations[mid - 1] + durations[mid]) / 2;
-  const p90 = durations[Math.floor(durations.length * 0.9)] || 0;
-  const monthlyAvgAll = Object.keys(monthly).sort().map(k => [k, monthly[k].reduce((a,b)=>a+b,0) / monthly[k].length]);
-  const monthlyAvgLast14 = monthlyAvgAll.slice(-14);
-
-  return {
-    boardName: data.name,
-    decorrerExterno, decorrerInternoByWs, metalomecanica, planeamentoInterno, pedreirasBySite,
-    resolution: { count: durations.length, mean, median, p90, monthlyAvgLast14 },
-    totals: {
-      totalOpen: cards.filter(c => !c.closed).length,
-      totalClosed: cards.filter(c => c.closed).length,
-      totalAll: cards.length,
-    },
-  };
-}
-
-function monthLabel(key) {
-  const [y, m] = key.split('-');
-  return `${MONTH_PT[parseInt(m,10)-1]}/${y.slice(2)}`;
-}
-
-// ---------------------------------------------------------------
-// Render
-// ---------------------------------------------------------------
-let currentTab = 'overview';
-
 function render(P, now) {
   const kpiExt = P.decorrerExterno.length;
-  const kpiInt = WS_ORDER.reduce((s, w) => s + (P.decorrerInternoByWs[w] || []).length, 0);
+  const kpiInt = P.workshops.reduce((s, w) => s + w.decorrer.length, 0);
+  const kpiPlanPendente = P.workshops.reduce((s, w) => s + w.planeamento.length, 0);
   const kpiMetal = P.metalomecanica.length;
-  const kpiPedreiras = PEDREIRAS_ORDER.reduce((s, site) => s + (P.pedreirasBySite[site] || []).length, 0);
+  const kpiPedreiras = P.pedreiras.reduce((s, p) => s + p.cards.length, 0);
   const res = P.resolution;
 
-  const workshopData = WS_ORDER.map(w => [w, (P.decorrerInternoByWs[w] || []).length]);
+  const workshopData = P.workshops.map(w => [w.label, w.decorrer.length, `decorrer-interno.html#${w.key}`]);
   const workshopColors = [CAT_BLUE, CAT_AQUA, CAT_YELLOW];
-  const pedreirasData = PEDREIRAS_ORDER.map(s => [s, (P.pedreirasBySite[s] || []).length]);
 
   const supplierCounts = {};
   P.decorrerExterno.forEach(c => { if (c.supplier) supplierCounts[c.supplier] = (supplierCounts[c.supplier]||0)+1; });
-  const supplierData = Object.entries(supplierCounts).sort((a,b) => b[1]-a[1]);
+  const supplierData = Object.entries(supplierCounts).sort((a,b) => b[1]-a[1]).slice(0, 8)
+    .map(([label, v]) => [label, v, 'decorrer-externo.html']);
+
+  const pedreirasData = P.pedreiras.map(p => [p.label, p.cards.length, `pedreiras.html#${p.key}`]);
+
+  const labelCounts = {};
+  P.planeamentoInterno.forEach(c => {
+    const names = c.labels.length ? c.labels.map(l => l.name) : ['(sem etiqueta)'];
+    names.forEach(n => { labelCounts[n] = (labelCounts[n]||0) + 1; });
+  });
+  const labelData = Object.entries(labelCounts).sort((a,b) => b[1]-a[1])
+    .map(([label, v]) => [label, v, `planeamento-interno.html#${slug(label)}`]);
 
   const trendPoints = res.monthlyAvgLast14.map(([k,v]) => [monthLabel(k), Math.round(v*10)/10]);
 
-  let decorrerInternoSections = '';
-  WS_ORDER.forEach(w => {
-    const cardsW = P.decorrerInternoByWs[w] || [];
-    decorrerInternoSections += `
-      <div class="site-block">
-        <h3>${esc(w)} (${cardsW.length})</h3>
-        <table><thead>${tableHeader({showStart:true, showRunning:true})}</thead>
-          <tbody>${cardRows(cardsW, {showStart:true, showRunning:true, now})}</tbody></table>
-      </div>`;
-  });
-
-  let pedreirasSections = '';
-  PEDREIRAS_ORDER.forEach(site => {
-    const cardsS = P.pedreirasBySite[site] || [];
-    if (!cardsS.length) return;
-    pedreirasSections += `
-      <div class="site-block">
-        <h3>${esc(site)} (${cardsS.length})</h3>
-        <table><thead>${tableHeader({})}</thead><tbody>${cardRows(cardsS, {now})}</tbody></table>
-      </div>`;
-  });
-
-  // Planeamento Interno grouped by label
-  const labelGroups = {};
-  P.planeamentoInterno.forEach(c => {
-    const names = c.labels.length ? c.labels.map(l => l.name) : ['(sem etiqueta)'];
-    names.forEach(n => { (labelGroups[n] = labelGroups[n] || []).push(c); });
-  });
-  const orderedLabels = Object.keys(labelGroups).sort((a, b) => {
-    if (a === '(sem etiqueta)') return 1;
-    if (b === '(sem etiqueta)') return -1;
-    return labelGroups[b].length - labelGroups[a].length;
-  });
-  function labelColorFor(name) {
-    for (const c of P.planeamentoInterno) {
-      for (const l of c.labels) if (l.name === name) return LABEL_COLOR_MAP[l.color] || '#c3c2b7';
-    }
-    return '#c3c2b7';
-  }
-  let planGroupsHtml = '';
-  orderedLabels.forEach(lname => {
-    const groupCards = labelGroups[lname].slice().sort((a,b) => {
-      const av = a.due === null ? 1 : 0, bv = b.due === null ? 1 : 0;
-      if (av !== bv) return av - bv;
-      return (a.due||'').localeCompare(b.due||'');
-    });
-    const color = lname === '(sem etiqueta)' ? '#c3c2b7' : labelColorFor(lname);
-    planGroupsHtml += `
-      <div class="label-group">
-        <h3><span class="dot" style="--chip:${color}"></span>${esc(lname)} <span class="count">(${groupCards.length})</span></h3>
-        <table><thead>${tableHeader({showCreated:true})}</thead>
-          <tbody>${cardRows(groupCards, {showCreated:true, sortByDue:false, now})}</tbody></table>
-      </div>`;
-  });
-
-  const monthlyRows = res.monthlyAvgLast14.map(([k,v]) => {
-    const vv = Math.round(v*10)/10;
-    return `<tr><td data-sort="${k}">${esc(monthLabel(k))}</td><td data-sort="${vv}">${vv}</td></tr>`;
-  }).join('');
-
-  const html = `
+  document.getElementById('content').innerHTML = `
     <div class="kpi-row">
       <div class="stat-tile"><div class="label">Cartões em curso</div><div class="value">${P.totals.totalOpen}</div></div>
       <div class="stat-tile"><div class="label">A Decorrer Externo</div><div class="value">${kpiExt}</div></div>
-      <div class="stat-tile"><div class="label">A Decorrer Interno</div><div class="value">${kpiInt}</div></div>
+      <div class="stat-tile"><div class="label">A Decorrer Interno</div><div class="value">${kpiInt}</div><div class="sub">${kpiPlanPendente} a aguardar planeamento</div></div>
       <div class="stat-tile"><div class="label">Pendentes Pedreiras</div><div class="value">${kpiPedreiras}</div></div>
       <div class="stat-tile"><div class="label">Pendentes Metalomecânica</div><div class="value">${kpiMetal}</div></div>
       <div class="stat-tile"><div class="label">Resolução (mediana)</div><div class="value">${res.median.toFixed(0)}d</div><div class="sub">média ${res.mean.toFixed(0)}d</div></div>
     </div>
 
-    <nav class="tabs">
-      <button class="tabbtn ${currentTab==='overview'?'active':''}" data-tab="overview">Visão Geral</button>
-      <button class="tabbtn ${currentTab==='pedreiras'?'active':''}" data-tab="pedreiras">Pedreiras</button>
-      <button class="tabbtn ${currentTab==='planeamento'?'active':''}" data-tab="planeamento">Planeamento Interno</button>
-    </nav>
+    <section class="card">
+      <h2>A Decorrer Externo <a class="see-more" href="decorrer-externo.html">Ver detalhe →</a></h2>
+      <p class="desc">${kpiExt} cartões atualmente em curso · top fornecedores (clica numa barra para ver a lista completa)</p>
+      ${hbarChart(supplierData, CAT_BLUE, {width:720, barH:16, gap:10})}
+    </section>
 
-    <div id="tab-overview" ${currentTab!=='overview'?'hidden':''}>
-      <section class="card">
-        <h2>A Decorrer Externo</h2>
-        <p class="desc">${kpiExt} cartões atualmente em curso · lista "Intervenções Externas DECORRER" · "Dias a decorrer" conta desde a data de início (ou, se não preenchida, desde a criação do cartão — assinalado com *)</p>
-        <p class="info-note" style="margin-top:0;margin-bottom:10px;">Cartões por fornecedor (extraído do texto entre [] no início do nome do cartão):</p>
-        ${hbarChart(supplierData, CAT_BLUE, {width:720, barH:16, gap:10})}
-        <table style="margin-top:18px;"><thead>${tableHeader({showStart:true, showRunning:true})}</thead>
-          <tbody>${cardRows(P.decorrerExterno, {showStart:true, showRunning:true, now})}</tbody></table>
-      </section>
+    <section class="card">
+      <h2>A Decorrer Interno <a class="see-more" href="decorrer-interno.html">Ver detalhe →</a></h2>
+      <p class="desc">${kpiInt} cartões a decorrer nas oficinas [Simão], por categoria — clica numa barra para ver a lista dessa categoria</p>
+      ${hbarChart(workshopData, workshopColors, {barH:20, gap:16})}
+    </section>
 
-      <section class="card">
-        <h2>A Decorrer Interno</h2>
-        <p class="desc">${kpiInt} cartões atualmente em curso, distribuídos pelas oficinas [Simão] · "Dias a decorrer" conta desde a data de início (ou desde a criação, assinalado com *)</p>
-        ${hbarChart(workshopData, workshopColors, {barH:20, gap:16})}
-        ${decorrerInternoSections}
-      </section>
-
-      <section class="card">
-        <h2>Tempos médios de resolução</h2>
-        <p class="desc">Calculado por (data de conclusão − data de início) para todos os ${res.count} cartões do quadro com ambas as datas preenchidas · tendência mensal, média de dias por mês de conclusão</p>
-        <div class="kpi-row" style="margin-bottom:18px;">
-          <div class="stat-tile"><div class="label">Mediana</div><div class="value">${res.median.toFixed(1)}d</div></div>
-          <div class="stat-tile"><div class="label">Média</div><div class="value">${res.mean.toFixed(1)}d</div></div>
-          <div class="stat-tile"><div class="label">P90</div><div class="value">${res.p90.toFixed(0)}d</div><div class="sub">90% dos cartões resolvem-se neste prazo ou menos</div></div>
-          <div class="stat-tile"><div class="label">Amostra</div><div class="value">${res.count}</div></div>
-        </div>
-        ${lineChart(trendPoints)}
-        <details class="tbl-toggle"><summary>Ver valores mensais</summary>
-          <table><thead><tr><th data-type="text">Mês</th><th data-type="num">Média (dias)</th></tr></thead>
-            <tbody>${monthlyRows}</tbody></table>
-        </details>
-      </section>
-
-      <section class="card">
-        <h2>Serviços solicitados à Metalomecânica</h2>
-        <p class="desc">${kpiMetal} cartões pendentes · lista "Metalomecanica"</p>
-        <table><thead>${tableHeader({showStart:true})}</thead>
-          <tbody>${cardRows(P.metalomecanica, {showStart:true, now})}</tbody></table>
-      </section>
-
-      <footer class="note">
-        Fonte: API do Trello do board "${esc(P.boardName)}", em direto a partir deste browser. Os tempos de resolução usam os campos "Início" e "Concluído" de cada cartão — cartões sem uma das duas datas não entram na amostra. Cartões usados apenas como separadores de secção (ex: "▼PRAGOSA▼") são excluídos de todas as contagens e tabelas.
-      </footer>
-    </div>
-
-    <div id="tab-pedreiras" ${currentTab!=='pedreiras'?'hidden':''}>
-      <section class="card">
-        <h2>Serviços Pendentes em Pedreiras</h2>
-        <p class="desc">${kpiPedreiras} cartões pendentes em obra, por pedreira</p>
-        ${hbarChart(pedreirasData, CAT_BLUE, {barH:20, gap:16})}
-        ${pedreirasSections}
-      </section>
-    </div>
-
-    <div id="tab-planeamento" ${currentTab!=='planeamento'?'hidden':''}>
-      <section class="card">
-        <h2>Planeamento Interno — trabalhos a distribuir</h2>
-        <p class="desc">${P.planeamentoInterno.length} cartões na lista "Planeamento Interno", agrupados por etiqueta (um cartão com várias etiquetas aparece em cada grupo correspondente) e ordenados por prazo dentro de cada grupo</p>
-        ${planGroupsHtml}
-      </section>
-    </div>
-  `;
-  document.getElementById('content').innerHTML = html;
-  wireTabs();
-  wireSorting();
-}
-
-function wireTabs() {
-  document.querySelectorAll('nav.tabs .tabbtn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      currentTab = btn.dataset.tab;
-      document.querySelectorAll('nav.tabs .tabbtn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      ['overview','pedreiras','planeamento'].forEach(t => {
-        const el = document.getElementById('tab-'+t);
-        if (el) el.hidden = (btn.dataset.tab !== t);
-      });
-    });
-  });
-}
-function wireSorting() {
-  document.querySelectorAll('table').forEach(table => {
-    const thead = table.querySelector('thead'), tbody = table.querySelector('tbody');
-    if (!thead || !tbody) return;
-    const ths = Array.from(thead.querySelectorAll('th'));
-    ths.forEach((th, idx) => {
-      th.addEventListener('click', () => {
-        const dir = th.classList.contains('sort-asc') ? 'desc' : 'asc';
-        ths.forEach(h => h.classList.remove('sort-asc','sort-desc'));
-        th.classList.add(dir === 'asc' ? 'sort-asc' : 'sort-desc');
-        const type = th.dataset.type || 'text';
-        const rows = Array.from(tbody.querySelectorAll('tr'));
-        rows.sort((a,b) => {
-          const ca=a.children[idx], cb=b.children[idx];
-          const av = ca ? (ca.dataset.sort ?? ca.textContent.trim().toLowerCase()) : '';
-          const bv = cb ? (cb.dataset.sort ?? cb.textContent.trim().toLowerCase()) : '';
-          let cmp;
-          if (type === 'num') cmp = (parseFloat(av)||0) - (parseFloat(bv)||0);
-          else cmp = av < bv ? -1 : (av > bv ? 1 : 0);
-          return dir === 'asc' ? cmp : -cmp;
-        });
-        rows.forEach(r => tbody.appendChild(r));
-      });
-    });
-  });
-}
-
-// ---------------------------------------------------------------
-// Fetch / status / modal wiring
-// ---------------------------------------------------------------
-function setStatus(state, text) {
-  document.getElementById('statusDot').className = 'dot-live ' + (state || '');
-  document.getElementById('statusText').textContent = text;
-}
-function showEmptyState(msg) {
-  document.getElementById('content').innerHTML = `<div class="empty-state">${esc(msg)}</div>`;
-}
-
-async function fetchAndRender() {
-  const { key, token } = getCreds();
-  if (!key || !token) { openCredsModal(); return; }
-  setStatus('', 'A atualizar…');
-  try {
-    const url = `https://api.trello.com/1/boards/${BOARD_ID}?fields=name,url&lists=all&list_fields=${LIST_FIELDS}&cards=all&card_fields=${CARD_FIELDS}&key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
-    const now = new Date();
-    const P = processBoard(data, now);
-    render(P, now);
-    const t = now.toLocaleString('pt-PT');
-    setStatus('ok', 'Atualizado às ' + t);
-  } catch (err) {
-    console.error(err);
-    setStatus('err', 'Falha ao ligar à API do Trello (' + err.message + ')');
-    showEmptyState('Não foi possível ir buscar os dados diretamente (pode ser um bloqueio de CORS do browser, ou a key/token estarem inválidos). Podes tentar "Configurar chave/token" para verificar as credenciais, ou usar a alternativa de colar o JSON exportado manualmente nesse mesmo painel.');
-  }
-}
-
-function openCredsModal() {
-  const { key, token } = getCreds();
-  document.getElementById('modalRoot').innerHTML = `
-    <div class="modal-backdrop" id="backdrop">
-      <div class="modal">
-        <h3>Ligar ao Trello</h3>
-        <p>A key e o token ficam guardados só neste browser (localStorage), nunca são enviados para mais lado nenhum além da API do Trello. Obtém em <a href="https://trello.com/power-ups/admin/api-key" target="_blank" rel="noopener">trello.com/power-ups/admin/api-key</a>.</p>
-        <label>API Key</label>
-        <input id="inpKey" type="text" value="${esc(key)}" placeholder="a tua API key">
-        <label>Token</label>
-        <input id="inpToken" type="text" value="${esc(token)}" placeholder="o teu token">
-        <div class="row">
-          <button class="primary" id="btnSaveCreds">Guardar e atualizar</button>
-          <button id="btnCancelCreds">Cancelar</button>
-        </div>
-        <div class="hint">
-          Se a ligação direta falhar (bloqueio de CORS do browser), cola aqui o JSON exportado manualmente:
-          <textarea id="inpJson" placeholder="cola aqui o JSON do export, se necessário"></textarea>
-          <div class="row"><button id="btnLoadJson">Carregar deste JSON</button></div>
-        </div>
+    <section class="card">
+      <h2>Tempos médios de resolução</h2>
+      <p class="desc">Calculado por (data de conclusão − data de início) para todos os ${res.count} cartões do quadro com ambas as datas preenchidas · tendência mensal, média de dias por mês de conclusão</p>
+      <div class="kpi-row" style="margin-bottom:18px;">
+        <div class="stat-tile"><div class="label">Mediana</div><div class="value">${res.median.toFixed(1)}d</div></div>
+        <div class="stat-tile"><div class="label">Média</div><div class="value">${res.mean.toFixed(1)}d</div></div>
+        <div class="stat-tile"><div class="label">P90</div><div class="value">${res.p90.toFixed(0)}d</div><div class="sub">90% dos cartões resolvem-se neste prazo ou menos</div></div>
+        <div class="stat-tile"><div class="label">Amostra</div><div class="value">${res.count}</div></div>
       </div>
-    </div>`;
-  document.getElementById('btnCancelCreds').onclick = () => { document.getElementById('modalRoot').innerHTML = ''; };
-  document.getElementById('backdrop').addEventListener('click', e => { if (e.target.id === 'backdrop') document.getElementById('modalRoot').innerHTML = ''; });
-  document.getElementById('btnSaveCreds').onclick = () => {
-    const k = document.getElementById('inpKey').value.trim();
-    const t = document.getElementById('inpToken').value.trim();
-    setCreds(k, t);
-    document.getElementById('modalRoot').innerHTML = '';
-    fetchAndRender();
-  };
-  document.getElementById('btnLoadJson').onclick = () => {
-    const txt = document.getElementById('inpJson').value.trim();
-    if (!txt) return;
-    try {
-      const data = JSON.parse(txt);
-      const now = new Date();
-      const P = processBoard(data, now);
-      render(P, now);
-      setStatus('ok', 'Carregado manualmente às ' + now.toLocaleString('pt-PT'));
-      document.getElementById('modalRoot').innerHTML = '';
-    } catch (err) {
-      alert('JSON inválido: ' + err.message);
-    }
-  };
+      ${lineChart(trendPoints)}
+      <details class="tbl-toggle"><summary>Ver valores mensais</summary>
+        <table><thead><tr><th data-type="text">Mês</th><th data-type="num">Média (dias)</th></tr></thead>
+          <tbody>${res.monthlyAvgLast14.map(([k,v]) => { const vv = Math.round(v*10)/10; return `<tr><td data-sort="${k}">${esc(monthLabel(k))}</td><td data-sort="${vv}">${vv}</td></tr>`; }).join('')}</tbody></table>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>Serviços Pendentes em Pedreiras <a class="see-more" href="pedreiras.html">Ver detalhe →</a></h2>
+      <p class="desc">${kpiPedreiras} cartões pendentes em obra, por pedreira — clica numa barra para ver essa pedreira</p>
+      ${hbarChart(pedreirasData, CAT_BLUE, {barH:20, gap:16})}
+    </section>
+
+    <section class="card">
+      <h2>Serviços solicitados à Metalomecânica <a class="see-more" href="metalomecanica.html">Ver detalhe →</a></h2>
+      <p class="desc">${kpiMetal} cartões pendentes · lista "Metalomecanica"</p>
+    </section>
+
+    <section class="card">
+      <h2>Planeamento Interno <a class="see-more" href="planeamento-interno.html">Ver detalhe →</a></h2>
+      <p class="desc">${P.planeamentoInterno.length} cartões a aguardar planeamento, por etiqueta — clica numa barra para ver esse grupo</p>
+      ${labelData.length ? hbarChart(labelData, CAT_BLUE, {barH:16, gap:10}) : '<p class="info-note">Sem cartões nesta lista de momento.</p>'}
+    </section>
+
+    <footer class="note">
+      Fonte: API do Trello do board "${esc(P.boardName)}", em direto a partir deste browser. Os tempos de resolução usam os campos "Início" e "Concluído" de cada cartão — cartões sem uma das duas datas não entram na amostra. Cartões usados apenas como separadores de secção (ex: "▼PRAGOSA▼") são excluídos de todas as contagens e tabelas.
+    </footer>
+  `;
 }
-
-document.getElementById('btnUpdate').addEventListener('click', fetchAndRender);
-document.getElementById('btnCreds').addEventListener('click', openCredsModal);
-
-// Auto-run on load if credentials already saved
-const initial = getCreds();
-if (initial.key && initial.token) {
-  fetchAndRender();
-} else {
-  setStatus('', 'Por configurar');
-  showEmptyState('Ainda sem dados. Clica em "Configurar chave/token" para ligar ao teu board do Trello.');
-}
-
-// Test hook (used by internal QA only)
-window.__processBoard = processBoard;
-window.__render = render;
+initPage('index', render);
 </script>
 </body>
 </html>

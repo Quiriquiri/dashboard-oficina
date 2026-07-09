@@ -1,26 +1,34 @@
-# Dashboard Oficina — Trello (ao vivo)
+# Dashboard Oficina — Trello (site multi-página)
 
-Dashboard estático que se liga diretamente à API do Trello a partir do browser de quem o abre.
-Não guarda nem expõe nenhum dado do Trello — cada pessoa que abre a página introduz a sua
-própria API key + token (ficam guardados só no `localStorage` do respetivo browser).
+Site estático com 6 páginas que se ligam diretamente à API do Trello a partir do browser de quem
+o abre. Nenhum dado do Trello fica guardado no código — cada pessoa que abre o site introduz a
+própria API key + token (ficam só no `localStorage` do respetivo browser, partilhados entre todas
+as páginas do mesmo site).
+
+Páginas: Visão Geral (`index.html`), A Decorrer Externo, A Decorrer Interno (Ligeiros / Pesados /
+Máquinas, com sub-secção de "pendente de planeamento" para os Ligeiros), Pedreiras, Metalomecânica,
+Planeamento Interno. Os gráficos da Visão Geral têm barras clicáveis que levam diretamente à
+secção correspondente na página de detalhe.
 
 ## Publicar no GitHub Pages (sem usar a linha de comandos)
 
 1. Em https://github.com/new, cria um repositório novo (pode ser público — ver nota de
    privacidade abaixo). Nome sugerido: `dashboard-oficina`.
-2. Dentro do repositório, clica em **Add file → Upload files** e arrasta o `index.html` (e este
-   `README.md`, opcional) que vieram junto com este ficheiro.
+2. Dentro do repositório, clica em **Add file → Upload files** e arrasta TODOS os ficheiros deste
+   pacote (`index.html`, `decorrer-externo.html`, `decorrer-interno.html`, `pedreiras.html`,
+   `metalomecanica.html`, `planeamento-interno.html`, `dashboard.js`, `styles.css`) — têm de ficar
+   todos na raiz do repositório, uns ao lado dos outros.
 3. Faz **Commit changes**.
 4. Vai a **Settings → Pages**. Em "Build and deployment", escolhe **Deploy from a branch**,
    branch `main`, pasta `/ (root)`. Grava.
 5. Ao fim de 1-2 minutos, o GitHub mostra o link (algo como
-   `https://<o-teu-utilizador>.github.io/dashboard-oficina/`). Esse é o link definitivo do
-   dashboard.
+   `https://<o-teu-utilizador>.github.io/dashboard-oficina/`). Esse é o link definitivo — abre
+   sempre em `index.html` (a Visão Geral) e navega para as outras páginas pelo menu do topo.
 
-## Atualizar o dashboard no futuro
+## Atualizar o site no futuro
 
-Basta repetir o passo 2 (Upload files, substituindo o `index.html`) sempre que eu te enviar uma
-versão nova do ficheiro.
+Basta repetir o passo 2 (Upload files, substituindo os ficheiros que mudarem) sempre que eu te
+enviar uma versão nova.
 
 ## Nota de privacidade
 
@@ -30,8 +38,12 @@ mostra alguma coisa a quem introduzir a própria key/token do Trello com acesso 
 Se quiseres mesmo assim restringir o acesso à página em si (não só aos dados), isso só é possível
 com GitHub Pro/Team/Enterprise.
 
-## Ficheiro fonte
+## Manutenção — listas identificadas por nome
 
-`index.html` é a mesma versão "ao vivo" do dashboard (busca os dados diretamente da API do
-Trello no browser). A configuração de listas/categorias está documentada no projeto "Dashboard
-EQM" em `claude/trello-dashboard-config.md`.
+Ao contrário da versão anterior (de um único ficheiro), as listas do Trello são identificadas
+pelo **nome exato** da lista (não por ID), configurado no topo de `dashboard.js`. Se renomeares
+uma lista no Trello, ou criares uma nova equivalente, basta dizeres-me o novo nome exato para eu
+atualizar essa constante — não é preciso ir buscar IDs à API.
+
+A configuração completa (mapeamento de listas, metodologia dos tempos de resolução, etc.) está
+documentada no projeto "Dashboard EQM" em `claude/trello-dashboard-config.md`.

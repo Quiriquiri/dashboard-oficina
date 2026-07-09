@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Oficina — A Decorrer Interno</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap"><div id="app"></div></div>
+<script src="dashboard.js"></script>
+<script>
+function render(P, now) {
+  const totalDecorrer = P.workshops.reduce((s, w) => s + w.decorrer.length, 0);
+  const totalPlaneamento = P.workshops.reduce((s, w) => s + w.planeamento.length, 0);
+  const workshopData = P.workshops.map(w => [w.label, w.decorrer.length]);
+  const workshopColors = [CAT_BLUE, CAT_AQUA, CAT_YELLOW];
+
+  const sections = P.workshops.map(w => {
+    const planBlock = w.planeamentoList ? `
+      <div class="subgroup-title">Pendente de planeamento (${w.planeamento.length})</div>
+      ${cardTable(w.planeamento, {now})}
+      <div class="subgroup-title" style="margin-top:20px;">A decorrer (${w.decorrer.length})</div>
+      ${cardTable(w.decorrer, {showStart:true, showRunning:true, now})}
+    ` : cardTable(w.decorrer, {showStart:true, showRunning:true, now});
+    return `<div class="site-block" id="${w.key}">
+      <h3>${esc(w.label)} — ${w.decorrer.length} a decorrer${w.planeamentoList ? ` · ${w.planeamento.length} a aguardar planeamento` : ''}</h3>
+      ${planBlock}
+    </div>`;
+  }).join('');
+
+  document.getElementById('content').innerHTML = `
+    <div class="kpi-row">
+      <div class="stat-tile"><div class="label">A decorrer</div><div class="value">${totalDecorrer}</div></div>
+      <div class="stat-tile"><div class="label">A aguardar planeamento</div><div class="value">${totalPlaneamento}</div></div>
+    </div>
+    <section class="card">
+      <h2>A Decorrer Interno</h2>
+      <p class="desc">${totalDecorrer} cartões atualmente em curso, distribuídos pelas oficinas [Simão] · "Dias a decorrer" conta desde a data de início (ou desde a criação, assinalado com *)</p>
+      ${hbarChart(workshopData, workshopColors, {barH:20, gap:16})}
+      ${sections}
+    </section>
+  `;
+  // honour #anchor deep-links (e.g. from the home page chart) once content exists
+  if (location.hash) {
+    const el = document.querySelector(location.hash);
+    if (el) el.scrollIntoView();
+  }
+}
+initPage('decorrer-interno', render);
+</script>
+</body>
+</html>

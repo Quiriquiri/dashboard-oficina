@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Oficina — A Decorrer Externo</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap"><div id="app"></div></div>
+<script src="dashboard.js"></script>
+<script>
+function render(P, now) {
+  const cards = P.decorrerExterno;
+  const supplierCounts = {};
+  cards.forEach(c => { if (c.supplier) supplierCounts[c.supplier] = (supplierCounts[c.supplier]||0)+1; });
+  const supplierData = Object.entries(supplierCounts).sort((a,b) => b[1]-a[1]);
+
+  document.getElementById('content').innerHTML = `
+    <div class="kpi-row">
+      <div class="stat-tile"><div class="label">Cartões a decorrer</div><div class="value">${cards.length}</div></div>
+      <div class="stat-tile"><div class="label">Fornecedores distintos</div><div class="value">${supplierData.length}</div></div>
+    </div>
+    <section class="card">
+      <h2>A Decorrer Externo</h2>
+      <p class="desc">${cards.length} cartões atualmente em curso · lista "Intervenções Externas DECORRER" · "Dias a decorrer" conta desde a data de início (ou, se não preenchida, desde a criação do cartão — assinalado com *)</p>
+      <p class="info-note" style="margin-top:0;margin-bottom:10px;">Cartões por fornecedor (extraído do texto entre [] no início do nome do cartão):</p>
+      ${hbarChart(supplierData, CAT_BLUE, {width:720, barH:16, gap:10})}
+      <div style="margin-top:18px;">${cardTable(cards, {showStart:true, showRunning:true, now})}</div>
+    </section>
+  `;
+}
+initPage('decorrer-externo', render);
+</script>
+</body>
+</html>

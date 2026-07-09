@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Oficina — Metalomecânica</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap"><div id="app"></div></div>
+<script src="dashboard.js"></script>
+<script>
+function render(P, now) {
+  const cards = P.metalomecanica;
+  document.getElementById('content').innerHTML = `
+    <div class="kpi-row">
+      <div class="stat-tile"><div class="label">Cartões pendentes</div><div class="value">${cards.length}</div></div>
+    </div>
+    <section class="card">
+      <h2>Serviços solicitados à Metalomecânica</h2>
+      <p class="desc">${cards.length} cartões pendentes · lista "Metalomecanica"</p>
+      ${cardTable(cards, {showStart:true, now})}
+    </section>
+  `;
+}
+initPage('metalomecanica', render);
+</script>
+</body>
+</html>
