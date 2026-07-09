@@ -7,8 +7,8 @@ as páginas do mesmo site).
 
 Páginas: Visão Geral (`index.html`), A Decorrer Externo, A Decorrer Interno (Ligeiros / Pesados /
 Máquinas, com sub-secção de "pendente de planeamento" para os Ligeiros), Pedreiras, Metalomecânica,
-Planeamento Interno. Os gráficos da Visão Geral têm barras clicáveis que levam diretamente à
-secção correspondente na página de detalhe.
+Planeamento Interno, Falta de Peças. Os gráficos da Visão Geral têm barras clicáveis que levam
+diretamente à secção correspondente na página de detalhe.
 
 ## Publicar no GitHub Pages (sem usar a linha de comandos)
 
@@ -85,6 +85,26 @@ Os cartões que ainda não têm data de início (fila de planeamento — Ligeiro
 "Criado em" (data de criação do cartão) e "Dias por planear" (quantos dias já passaram desde essa
 criação). Serve para perceber há quanto tempo um trabalho está à espera de ser planeado, já que
 ainda não tem uma data de início real associada.
+
+## Página "Falta de Peças"
+
+Lista todos os cartões ativos (em qualquer lista do quadro, não só nas secções já cobertas pelas
+outras páginas) que tenham a etiqueta "Falta de Peças". Além das colunas habituais, tem uma coluna
+extra "Com esta etiqueta há" — quanto tempo passou desde que essa etiqueta foi aplicada ao cartão.
+
+Essa data vem do histórico de atividade do próprio cartão no Trello (o Trello não a devolve no
+pedido normal do board, por isso a página faz, só para estes cartões, um pedido adicional por
+cartão a consultar esse histórico). Por ser um pedido extra por cartão, só faz sentido aqui — é uma
+lista tipicamente pequena (dezenas de cartões, não milhares). Os resultados ficam em cache (3
+minutos, tal como o resto dos dados) para não repetir os pedidos a cada visita à página.
+
+Quando o histórico não tem o registo exato (por exemplo, uma etiqueta aplicada há muito tempo, fora
+da janela de atividade que o Trello guarda), a coluna mostra a data de criação do cartão como
+referência aproximada, assinalada com "*" — tal como acontece em "Dias a decorrer" quando falta a
+data de início real.
+
+A tabela começa ordenada pela etiqueta mais antiga primeiro (quem está à espera de peças há mais
+tempo no topo); podes reordenar por qualquer coluna clicando no cabeçalho, como nas outras páginas.
 
 ## Nota de privacidade
 

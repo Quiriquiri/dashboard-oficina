@@ -41,6 +41,7 @@ const LABEL_COLOR_MAP = {
 };
 const MONTH_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const NO_DATE_SORT = '9999-12-31';
+const FALTA_DE_PECAS_LABEL = 'Falta de Peças';
 
 const PAGES = [
   { key: 'index', file: 'index.html', label: 'Visão Geral' },
@@ -49,6 +50,7 @@ const PAGES = [
   { key: 'pedreiras', file: 'pedreiras.html', label: 'Pedreiras' },
   { key: 'metalomecanica', file: 'metalomecanica.html', label: 'Metalomecânica' },
   { key: 'planeamento-interno', file: 'planeamento-interno.html', label: 'Planeamento Interno' },
+  { key: 'falta-de-pecas', file: 'falta-de-pecas.html', label: 'Falta de Peças' },
 ];
 
 // ---------------------------------------------------------------
@@ -210,11 +212,12 @@ function runningDaysCell(card, now) {
   const tag = real ? '' : '<span class="approx">*</span>';
   return `<td data-sort="${rd}"${cls}>${rd}d${tag}</td>`;
 }
-function tableHeader({ showStart, showCreated, showRunning, runningLabel } = {}) {
+function tableHeader({ showStart, showCreated, showRunning, runningLabel, showLabelAge } = {}) {
   let cols = [['Nº', 'num'], ['Cartão', 'text']];
   if (showCreated) cols.push(['Criado em', 'text']);
   if (showStart) cols.push(['Início', 'text']);
   if (showRunning) cols.push([runningLabel || 'Dias a decorrer', 'num']);
+  if (showLabelAge) cols.push(['Com esta etiqueta há', 'num']);
   cols.push(['Prazo', 'text'], ['Etiquetas', 'text']);
   return '<tr>' + cols.map(([c, t]) => `<th data-type="${t}">${c}</th>`).join('') + '</tr>';
 }
@@ -254,6 +257,7 @@ function cardRows(cards, opts) {
     const startCol = opts.showStart ? `<td class="start-cell" data-sort="${startSort}">${startCellHtml}</td>` : '';
     const createdCol = opts.showCreated ? `<td data-sort="${(c.created||'').substring(0,10) || NO_DATE_SORT}">${fmtDate(c.created)}</td>` : '';
     const runningCol = opts.showRunning ? runningDaysCell(c, now) : '';
+    const labelAgeCol = opts.showLabelAge ? `<td class="label-age-cell" data-trello-id="${esc(c.trelloId)}" data-sort="-1">A calcular…</td>` : '';
     const labelsText = c.labels.map(l => l.name).join(', ');
     const labelsCellHtml = labelsEditableCell(c, opts.boardLabels);
     const editBtn = c.trelloId ? `<button type="button" class="card-edit-btn" data-trello-id="${esc(c.trelloId)}" title="Editar cartão (nome, descrição, lista, membros, arquivar)">✎</button>` : '';
@@ -265,7 +269,7 @@ function cardRows(cards, opts) {
     return `<tr>
       <td class="col-id" data-sort="${c.id}">#${c.id}</td>
       <td data-sort="${esc(c.name.toLowerCase())}"><a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.name)}</a>${editBtn}${membersLine}</td>
-      ${createdCol}${startCol}${runningCol}
+      ${createdCol}${startCol}${runningCol}${labelAgeCol}
       <td data-sort="${dueSort}" class="due-cell">${dueCellHtml}</td>
       <td data-sort="${esc(labelsText.toLowerCase())}" class="labels-cell">${labelsCellHtml}</td>
     </tr>`;
@@ -313,6 +317,12 @@ function processBoard(data, now) {
 
   const pedreiras = PEDREIRAS.map(p => ({ ...p, cards: openCardsInName(p.list) }));
 
+  // Falta de Peças — cartões ativos com esta etiqueta em QUALQUER lista do board (não só nas
+  // listas seguidas nominalmente acima), para a página dedicada "Falta de Peças".
+  const faltaDePecas = cards
+    .filter(c => !c.closed && !isDivider(c.name) && (c.labels || []).some(l => l.name === FALTA_DE_PECAS_LABEL))
+    .map(cardBrief);
+
   // resolution stats — over ALL cards on the board with both start & dateCompleted
   const durations = [];
   const monthly = {};
@@ -340,7 +350,7 @@ function processBoard(data, now) {
   // flat index of every card object we produced, keyed by Trello id — used by the
   // "editar cartão" modal to look up full details (desc, idList, idMembers, …) from just an id.
   const cardsById = {};
-  [decorrerExterno, metalomecanica, planeamentoInterno,
+  [decorrerExterno, metalomecanica, planeamentoInterno, faltaDePecas,
     ...workshops.flatMap(w => [w.decorrer, w.planeamento]),
     ...pedreiras.map(p => p.cards)]
     .flat()
@@ -348,7 +358,7 @@ function processBoard(data, now) {
 
   return {
     boardName: data.name,
-    decorrerExterno, metalomecanica, planeamentoInterno, workshops, pedreiras, boardLabels,
+    decorrerExterno, metalomecanica, planeamentoInterno, workshops, pedreiras, faltaDePecas, boardLabels,
     boardMembers, allLists, cardsById,
     resolution: { count: durations.length, mean, median, p90, monthlyAvgLast14 },
     totals: {
@@ -640,6 +650,110 @@ function wireCardEditing(root, P) {
       openCardEditModal(btn.dataset.trelloId, P);
     });
   });
+}
+
+// ---------------------------------------------------------------
+// "Com esta etiqueta há" (label ageing) — só usado na página Falta de Peças.
+// O Trello não devolve "desde quando um cartão tem uma etiqueta" no fetch normal do
+// board; para isso é preciso ir ao histórico de atividade de CADA cartão
+// (GET /1/cards/{id}/actions?filter=addLabelToCard,removeLabelToCard), um pedido por
+// cartão. Como esta página só lista cartões com a etiqueta "Falta de Peças" (um
+// subconjunto pequeno do board, não todos os milhares de cartões), isto é viável — os
+// pedidos correm com um limite de concorrência para não sobrecarregar a API do Trello.
+// Resultado: para cada cartão, a data do "addLabelToCard" mais recente para essa
+// etiqueta específica. Se o histórico não tiver esse evento (por exemplo, fora da
+// janela de retenção de atividade do Trello), usa a data de criação do cartão como
+// limite inferior aproximado, assinalado com "*" — o mesmo padrão já usado em "Dias a
+// decorrer" quando falta a data de início real.
+// ---------------------------------------------------------------
+function labelAgeingCacheKey(labelId) { return `trello_label_age_v1_${labelId}`; }
+function readLabelAgeingCache(labelId) {
+  try {
+    const raw = sessionStorage.getItem(labelAgeingCacheKey(labelId));
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (Date.now() - obj.ts > CACHE_TTL_MS) return null;
+    return obj.data;
+  } catch (e) { return null; }
+}
+function writeLabelAgeingCache(labelId, data) {
+  try { sessionStorage.setItem(labelAgeingCacheKey(labelId), JSON.stringify({ ts: Date.now(), data })); }
+  catch (e) { /* ignore */ }
+}
+async function fetchLabelAgeing(cards, labelId, key, token) {
+  const results = {};
+  const CONCURRENCY = 4;
+  let idx = 0;
+  async function worker() {
+    while (idx < cards.length) {
+      const card = cards[idx++];
+      try {
+        const params = new URLSearchParams({ key, token, filter: 'addLabelToCard,removeLabelToCard', limit: '30' });
+        const resp = await fetch(`https://api.trello.com/1/cards/${card.trelloId}/actions?${params.toString()}`);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const actions = await resp.json();
+        // Trello devolve as ações mais recentes primeiro — a primeira que bate certo com
+        // esta etiqueta é o estado mais recente (adicionada ou removida).
+        const latest = actions.find(a => a.data && a.data.label && a.data.label.id === labelId);
+        if (latest && latest.type === 'addLabelToCard') {
+          results[card.trelloId] = { since: latest.date, approx: false };
+        } else {
+          results[card.trelloId] = { since: card.created, approx: true };
+        }
+      } catch (err) {
+        console.error('falha ao ir buscar o histórico da etiqueta para', card.trelloId, err);
+        results[card.trelloId] = { since: card.created, approx: true };
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, cards.length) }, worker));
+  return results;
+}
+function applyLabelAgeing(cells, results, now) {
+  cells.forEach(td => {
+    const r = results[td.dataset.trelloId];
+    if (!r || !r.since) { td.textContent = '—'; td.dataset.sort = -1; return; }
+    const days = Math.floor((now - new Date(r.since)) / 86400000);
+    let cls = 'label-age-cell';
+    if (days >= 60) cls += ' days-critical'; else if (days >= 30) cls += ' days-warning';
+    td.className = cls;
+    td.dataset.sort = days;
+    td.innerHTML = `${days}d${r.approx ? '<span class="approx">*</span>' : ''}`;
+  });
+}
+// Chamado pela própria página falta-de-pecas.html depois de render(). Não faz parte do
+// pipeline genérico de initPage() porque só esta página tem a coluna "Com esta etiqueta há".
+async function wireLabelAgeing(P, now) {
+  const cells = document.querySelectorAll('td.label-age-cell');
+  if (!cells.length) return;
+  const statusEl = document.getElementById('ageingStatus');
+  const { key, token } = getCreds();
+  if (!key || !token) {
+    if (statusEl) statusEl.textContent = 'Sem key/token configurados — não é possível calcular há quanto tempo cada cartão tem a etiqueta (os restantes dados vieram do JSON carregado manualmente).';
+    return;
+  }
+  const targetLabel = (P.boardLabels || []).find(l => l.name === FALTA_DE_PECAS_LABEL);
+  if (!targetLabel) { if (statusEl) statusEl.remove(); return; }
+
+  const cached = readLabelAgeingCache(targetLabel.id);
+  if (cached) {
+    applyLabelAgeing(cells, cached, now);
+    if (statusEl) statusEl.remove();
+    return;
+  }
+  try {
+    const results = await fetchLabelAgeing(P.faltaDePecas || [], targetLabel.id, key, token);
+    writeLabelAgeingCache(targetLabel.id, results);
+    applyLabelAgeing(document.querySelectorAll('td.label-age-cell'), results, now);
+    if (statusEl) statusEl.remove();
+    // ordena por "há mais tempo com a etiqueta" por omissão, assim que os dados chegam
+    const table = document.querySelector('td.label-age-cell') ? document.querySelector('td.label-age-cell').closest('table') : null;
+    const th = table ? Array.from(table.querySelectorAll('thead th')).find(h => h.textContent.trim().startsWith('Com esta etiqueta')) : null;
+    if (th) { th.click(); th.click(); }
+  } catch (err) {
+    console.error(err);
+    if (statusEl) { statusEl.textContent = 'Não foi possível calcular há quanto tempo cada cartão tem a etiqueta (falha ao consultar o histórico do Trello).'; }
+  }
 }
 
 // ---------------------------------------------------------------

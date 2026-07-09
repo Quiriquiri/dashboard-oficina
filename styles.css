@@ -41,6 +41,8 @@ nav.pages a:hover { color: var(--series-1); }
 .stat-tile .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
 .stat-tile .value { font-size: 26px; font-weight: 600; line-height: 1; }
 .stat-tile .sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.stat-tile .sub a { color: var(--series-1); text-decoration: none; font-weight: 600; }
+.stat-tile .sub a:hover { text-decoration: underline; }
 
 section.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; margin-bottom: 20px; scroll-margin-top: 16px; }
 section.card h2 { font-size: 16px; margin: 0 0 2px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }

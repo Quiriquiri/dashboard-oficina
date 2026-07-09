@@ -16,6 +16,7 @@ function render(P, now) {
   const kpiPlanPendente = P.workshops.reduce((s, w) => s + w.planeamento.length, 0);
   const kpiMetal = P.metalomecanica.length;
   const kpiPedreiras = P.pedreiras.reduce((s, p) => s + p.cards.length, 0);
+  const kpiFaltaPecas = P.faltaDePecas.length;
   const res = P.resolution;
 
   const workshopData = P.workshops.map(w => [w.label, w.decorrer.length, `decorrer-interno.html#${w.key}`]);
@@ -46,6 +47,7 @@ function render(P, now) {
       <div class="stat-tile"><div class="label">Pendentes Pedreiras</div><div class="value">${kpiPedreiras}</div></div>
       <div class="stat-tile"><div class="label">Pendentes Metalomecânica</div><div class="value">${kpiMetal}</div></div>
       <div class="stat-tile"><div class="label">Resolução (mediana)</div><div class="value">${res.median.toFixed(0)}d</div><div class="sub">média ${res.mean.toFixed(0)}d</div></div>
+      <div class="stat-tile"><div class="label">Falta de Peças</div><div class="value">${kpiFaltaPecas}</div><div class="sub"><a href="falta-de-pecas.html">Ver lista →</a></div></div>
     </div>
 
     <section class="card">

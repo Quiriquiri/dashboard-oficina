@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Oficina — Falta de Peças</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap"><div id="app"></div></div>
+<script src="dashboard.js"></script>
+<script>
+function render(P, now) {
+  const cards = P.faltaDePecas;
+  document.getElementById('content').innerHTML = `
+    <div class="kpi-row">
+      <div class="stat-tile"><div class="label">Cartões a aguardar peças</div><div class="value">${cards.length}</div></div>
+    </div>
+    <section class="card">
+      <h2>Falta de Peças</h2>
+      <p class="desc">${cards.length} cartões ativos com a etiqueta "Falta de Peças", em qualquer lista do quadro · "Com esta etiqueta há" mostra há quanto tempo a etiqueta foi aplicada, a partir do histórico de atividade do Trello</p>
+      <p class="info-note" id="ageingStatus" style="margin-top:0;">A calcular há quanto tempo cada cartão tem a etiqueta…</p>
+      ${cardTable(cards, {showStart:true, showLabelAge:true, sortByDue:false, now, boardLabels:P.boardLabels, boardMembers:P.boardMembers})}
+    </section>
+  `;
+  wireLabelAgeing(P, now);
+}
+initPage('falta-de-pecas', render);
+</script>
+</body>
+</html>
