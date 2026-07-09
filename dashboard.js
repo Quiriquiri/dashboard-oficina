@@ -214,12 +214,14 @@ function cardRows(cards, opts) {
       const dleft = daysUntil(c.due, now);
       overdue = dleft !== null && dleft < 0;
     }
-    let dueHtml = '—', dueSort = NO_DATE_SORT;
-    if (c.due) {
-      const d = fmtDate(c.due);
-      dueHtml = overdue ? `<span class="overdue">${d} · atrasado</span>` : d;
-      dueSort = c.due.substring(0, 10);
-    }
+    let dueSort = NO_DATE_SORT, dueInputVal = '';
+    if (c.due) { dueSort = c.due.substring(0, 10); dueInputVal = dueSort; }
+    const overdueBadge = overdue ? '<span class="overdue-badge">atrasado</span>' : '';
+    const dueCellHtml = c.trelloId ? `
+      <input type="date" class="due-input" data-trello-id="${esc(c.trelloId)}" value="${dueInputVal}">
+      <button type="button" class="due-clear" data-trello-id="${esc(c.trelloId)}" title="Limpar prazo">×</button>
+      <span class="due-status" data-status-for="${esc(c.trelloId)}"></span>
+      ${overdueBadge}` : (c.due ? fmtDate(c.due) : '—');
     const startCol = opts.showStart ? `<td data-sort="${c.start ? c.start.substring(0,10) : NO_DATE_SORT}">${fmtDate(c.start)}</td>` : '';
     const createdCol = opts.showCreated ? `<td data-sort="${(c.created||'').substring(0,10) || NO_DATE_SORT}">${fmtDate(c.created)}</td>` : '';
     const runningCol = opts.showRunning ? runningDaysCell(c, now) : '';
@@ -229,7 +231,7 @@ function cardRows(cards, opts) {
       <td class="col-id" data-sort="${c.id}">#${c.id}</td>
       <td data-sort="${esc(c.name.toLowerCase())}"><a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.name)}</a></td>
       ${createdCol}${startCol}${runningCol}
-      <td data-sort="${dueSort}">${dueHtml}</td>
+      <td data-sort="${dueSort}" class="due-cell">${dueCellHtml}</td>
       <td data-sort="${esc(labelsText.toLowerCase())}">${labelsHtml}</td>
     </tr>`;
   }).join('\n');
@@ -252,7 +254,7 @@ function processBoard(data, now) {
   function cardBrief(c) {
     const labels = (c.labels || []).filter(l => l.name).map(l => ({ name: l.name, color: l.color }));
     return {
-      id: c.idShort, name: c.name, due: c.due, dueComplete: c.dueComplete,
+      id: c.idShort, trelloId: c.id, name: c.name, due: c.due, dueComplete: c.dueComplete,
       start: c.start, created: createdFromId(c.id).toISOString(),
       url: c.shortUrl, labels, supplier: supplierOf(c.name),
     };
@@ -356,6 +358,65 @@ function wireSorting(root) {
 }
 
 // ---------------------------------------------------------------
+// Editable "Prazo" (due date) — writes straight back to the Trello card.
+// Requires a token with write scope (see openCredsModal). Untested against the
+// live Trello API from the environment that built this (no network access there) —
+// if a save fails, the error shows inline; the card's own Trello link still works
+// as a fallback way to change the date.
+// ---------------------------------------------------------------
+async function updateCardDue(trelloId, isoDateOrNull, statusEl, cellEl) {
+  const { key, token } = getCreds();
+  if (!key || !token) { openCredsModal(); return; }
+  if (statusEl) { statusEl.textContent = 'A gravar…'; statusEl.className = 'due-status saving'; }
+  try {
+    const params = new URLSearchParams({ key, token, value: isoDateOrNull === null ? 'null' : isoDateOrNull });
+    const url = `https://api.trello.com/1/cards/${trelloId}/due?${params.toString()}`;
+    const resp = await fetch(url, { method: 'PUT' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    if (statusEl) {
+      statusEl.textContent = 'Guardado ✓';
+      statusEl.className = 'due-status ok';
+      setTimeout(() => { statusEl.textContent = ''; }, 2500);
+    }
+    if (cellEl) {
+      cellEl.dataset.sort = isoDateOrNull ? isoDateOrNull.substring(0, 10) : NO_DATE_SORT;
+      const badge = cellEl.querySelector('.overdue-badge');
+      if (badge) badge.remove();
+      if (isoDateOrNull) {
+        const overdue = new Date(isoDateOrNull) < new Date();
+        if (overdue) cellEl.insertAdjacentHTML('beforeend', '<span class="overdue-badge">atrasado</span>');
+      }
+    }
+  } catch (err) {
+    console.error(err);
+    if (statusEl) { statusEl.textContent = 'Falha ao gravar'; statusEl.className = 'due-status err'; }
+  }
+}
+
+function wireDueEditing(root) {
+  const scope = root || document;
+  scope.querySelectorAll('input.due-input').forEach(input => {
+    input.addEventListener('change', () => {
+      const trelloId = input.dataset.trelloId;
+      const cell = input.closest('td.due-cell');
+      const statusEl = cell ? cell.querySelector('.due-status') : null;
+      const iso = input.value ? new Date(input.value + 'T12:00:00Z').toISOString() : null;
+      updateCardDue(trelloId, iso, statusEl, cell);
+    });
+  });
+  scope.querySelectorAll('button.due-clear').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const trelloId = btn.dataset.trelloId;
+      const cell = btn.closest('td.due-cell');
+      const input = cell ? cell.querySelector('input.due-input') : null;
+      const statusEl = cell ? cell.querySelector('.due-status') : null;
+      if (input) input.value = '';
+      updateCardDue(trelloId, null, statusEl, cell);
+    });
+  });
+}
+
+// ---------------------------------------------------------------
 // Fetch / cache / credentials / bootstrap — shared by every page
 // ---------------------------------------------------------------
 function setStatus(state, text) {
@@ -418,11 +479,14 @@ function openCredsModal() {
     <div class="modal-backdrop" id="backdrop">
       <div class="modal">
         <h3>Ligar ao Trello</h3>
-        <p>A key e o token ficam guardados só neste browser (localStorage), partilhados entre todas as páginas deste site, nunca enviados para mais lado nenhum além da API do Trello. Obtém em <a href="https://trello.com/power-ups/admin/api-key" target="_blank" rel="noopener">trello.com/power-ups/admin/api-key</a>.</p>
+        <p>A key e o token ficam guardados só neste browser (localStorage), partilhados entre todas as páginas deste site, nunca enviados para mais lado nenhum além da API do Trello. Obtém a key em <a href="https://trello.com/power-ups/admin/api-key" target="_blank" rel="noopener">trello.com/power-ups/admin/api-key</a>.</p>
+        <p><strong>Para poder editar o Prazo</strong>, o token precisa de permissão de escrita — gera-o com este link (substitui SUA_API_KEY pela key acima): <br>
+        <code style="font-size:10px; word-break:break-all;">https://trello.com/1/authorize?expiration=30days&scope=read,write&response_type=token&key=SUA_API_KEY</code><br>
+        Um token só de leitura (scope=read) continua a mostrar os dados, mas as alterações ao Prazo falham.</p>
         <label>API Key</label>
         <input id="inpKey" type="text" value="${esc(key)}" placeholder="a tua API key">
         <label>Token</label>
-        <input id="inpToken" type="text" value="${esc(token)}" placeholder="o teu token">
+        <input id="inpToken" type="text" value="${esc(token)}" placeholder="o teu token (com permissão de escrita)">
         <div class="row">
           <button class="primary" id="btnSaveCreds">Guardar e atualizar</button>
           <button id="btnCancelCreds">Cancelar</button>
@@ -462,7 +526,12 @@ function openCredsModal() {
 // Every page calls this once, passing its own render(P, now) function.
 function initPage(activeKey, render) {
   document.getElementById('app').innerHTML = pageChrome(activeKey);
-  renderCallback = (P, now) => { render(P, now); wireSorting(document.getElementById('content')); };
+  renderCallback = (P, now) => {
+    render(P, now);
+    const contentEl = document.getElementById('content');
+    wireSorting(contentEl);
+    wireDueEditing(contentEl);
+  };
   document.getElementById('btnUpdate').addEventListener('click', () => fetchAndRender(true));
   document.getElementById('btnCreds').addEventListener('click', openCredsModal);
 

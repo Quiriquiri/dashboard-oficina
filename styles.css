@@ -63,6 +63,20 @@ table a:hover { color: var(--series-1); text-decoration: underline; }
 .days-warning { color: #a06a00; font-weight: 600; }
 .days-critical { color: var(--critical); font-weight: 600; }
 @media (prefers-color-scheme: dark) { .days-warning { color: var(--warning); } }
+
+td.due-cell { white-space: nowrap; }
+input.due-input { font: inherit; font-size: 12px; color: var(--text-primary); background: transparent;
+  border: 1px solid transparent; border-radius: 6px; padding: 3px 4px; width: 118px; cursor: pointer; }
+input.due-input:hover, input.due-input:focus { border-color: var(--border); background: var(--surface-2); cursor: text; }
+button.due-clear { appearance: none; border: none; background: none; color: var(--text-muted); cursor: pointer;
+  font-size: 14px; line-height: 1; padding: 2px 4px; vertical-align: middle; }
+button.due-clear:hover { color: var(--critical); }
+.due-status { font-size: 10px; margin-left: 4px; color: var(--text-muted); }
+.due-status.saving { color: var(--text-muted); }
+.due-status.ok { color: var(--good); }
+.due-status.err { color: var(--critical); font-weight: 600; }
+.overdue-badge { display: inline-block; font-size: 10px; font-weight: 600; color: var(--critical);
+  background: color-mix(in srgb, var(--critical) 14%, transparent); border-radius: 999px; padding: 2px 7px; margin-left: 4px; }
 .approx { color: var(--text-muted); }
 .chip { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--chip) 16%, transparent); color: var(--text-primary); border: 1px solid color-mix(in srgb, var(--chip) 55%, transparent); margin: 1px 3px 1px 0; }
 .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--chip); margin-right: 7px; }

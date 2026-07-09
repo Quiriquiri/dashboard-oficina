@@ -30,6 +30,15 @@ secção correspondente na página de detalhe.
 Basta repetir o passo 2 (Upload files, substituindo os ficheiros que mudarem) sempre que eu te
 enviar uma versão nova.
 
+## Editar o Prazo diretamente no dashboard
+
+A coluna "Prazo" de todas as tabelas é editável: clica na data para escolher outra, ou no "×" para
+limpar. A alteração é gravada de imediato no cartão do Trello (pedido `PUT` à API). Para isto
+funcionar, o token guardado no painel "Configurar chave/token" precisa de permissão de **escrita**
+— o link para gerar esse token (com `scope=read,write`) está explicado dentro do próprio painel.
+Um token só de leitura continua a mostrar os dados normalmente, só as alterações ao Prazo é que
+falham (aparece "Falha ao gravar" junto à data).
+
 ## Nota de privacidade
 
 No plano gratuito do GitHub, uma página do GitHub Pages é sempre publicamente acessível a quem
@@ -37,6 +46,12 @@ tiver o link, mesmo que o repositório seja privado. Isto não expõe dados do T
 mostra alguma coisa a quem introduzir a própria key/token do Trello com acesso ao board "OFICINA".
 Se quiseres mesmo assim restringir o acesso à página em si (não só aos dados), isso só é possível
 com GitHub Pro/Team/Enterprise.
+
+Nota adicional agora que há edição: um token com permissão de escrita permite alterar qualquer
+board a que a tua conta Trello tenha acesso, não só este — não é possível restringir o token a
+"só este board" ou "só ao Prazo" pela via simples de key+token. Trata o token como uma password
+(não o partilhes, não o mostres em capturas de ecrã) e podes revogá-lo a qualquer momento em
+trello.com/app-key.
 
 ## Manutenção — listas identificadas por nome
 
