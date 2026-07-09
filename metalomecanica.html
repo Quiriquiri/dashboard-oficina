@@ -19,7 +19,7 @@ function render(P, now) {
     <section class="card">
       <h2>Serviços solicitados à Metalomecânica</h2>
       <p class="desc">${cards.length} cartões pendentes · lista "Metalomecanica"</p>
-      ${cardTable(cards, {showStart:true, now})}
+      ${cardTable(cards, {showStart:true, now, boardLabels:P.boardLabels})}
     </section>
   `;
 }

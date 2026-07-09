@@ -5,6 +5,7 @@
 const BOARD_ID = 'cARsYBsY';
 const CARD_FIELDS = 'name,due,dueComplete,start,dateCompleted,dateLastActivity,closed,idList,labels,shortUrl,idShort';
 const LIST_FIELDS = 'name,closed';
+const BOARD_LABEL_FIELDS = 'all'; // full label palette of the board, for the labels editor
 const CACHE_KEY = 'trello_dash_cache_v2';
 const CACHE_TTL_MS = 3 * 60 * 1000; // 3 min: navegar entre páginas não repete o fetch
 
@@ -180,6 +181,25 @@ function labelChip(l) {
   const hexc = LABEL_COLOR_MAP[l.color] || '#c3c2b7';
   return `<span class="chip" style="--chip:${hexc}">${esc(l.name)}</span>`;
 }
+function labelsEditableCell(card, boardLabels) {
+  const chipsHtml = card.labels.map(labelChip).join('') || '<span class="chips-empty">—</span>';
+  if (!boardLabels || !boardLabels.length || !card.trelloId) return chipsHtml;
+  const items = boardLabels.map(l => {
+    const hexc = LABEL_COLOR_MAP[l.color] || '#c3c2b7';
+    const checked = card.labelIds.includes(l.id) ? 'checked' : '';
+    return `<label class="labels-popover-item">
+      <input type="checkbox" value="${esc(l.id)}" ${checked}>
+      <span class="dot" style="--chip:${hexc}"></span>${esc(l.name || '(sem nome)')}
+    </label>`;
+  }).join('');
+  return `
+    <span class="chips-display">${chipsHtml}</span>
+    <button type="button" class="labels-edit-btn" data-trello-id="${esc(card.trelloId)}" title="Editar etiquetas">+</button>
+    <div class="labels-popover" hidden data-trello-id="${esc(card.trelloId)}">
+      ${items}
+      <div class="labels-popover-footer"><span class="due-status" data-status-for="lbl-${esc(card.trelloId)}"></span></div>
+    </div>`;
+}
 function runningDaysCell(card, now) {
   const { rd, real } = daysRunning(card, now);
   if (rd === null) return '<td data-sort="-1">—</td>';
@@ -189,11 +209,11 @@ function runningDaysCell(card, now) {
   const tag = real ? '' : '<span class="approx">*</span>';
   return `<td data-sort="${rd}"${cls}>${rd}d${tag}</td>`;
 }
-function tableHeader({ showStart, showCreated, showRunning } = {}) {
+function tableHeader({ showStart, showCreated, showRunning, runningLabel } = {}) {
   let cols = [['Nº', 'num'], ['Cartão', 'text']];
   if (showCreated) cols.push(['Criado em', 'text']);
   if (showStart) cols.push(['Início', 'text']);
-  if (showRunning) cols.push(['Dias a decorrer', 'num']);
+  if (showRunning) cols.push([runningLabel || 'Dias a decorrer', 'num']);
   cols.push(['Prazo', 'text'], ['Etiquetas', 'text']);
   return '<tr>' + cols.map(([c, t]) => `<th data-type="${t}">${c}</th>`).join('') + '</tr>';
 }
@@ -226,13 +246,13 @@ function cardRows(cards, opts) {
     const createdCol = opts.showCreated ? `<td data-sort="${(c.created||'').substring(0,10) || NO_DATE_SORT}">${fmtDate(c.created)}</td>` : '';
     const runningCol = opts.showRunning ? runningDaysCell(c, now) : '';
     const labelsText = c.labels.map(l => l.name).join(', ');
-    const labelsHtml = c.labels.map(labelChip).join('');
+    const labelsCellHtml = labelsEditableCell(c, opts.boardLabels);
     return `<tr>
       <td class="col-id" data-sort="${c.id}">#${c.id}</td>
       <td data-sort="${esc(c.name.toLowerCase())}"><a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.name)}</a></td>
       ${createdCol}${startCol}${runningCol}
       <td data-sort="${dueSort}" class="due-cell">${dueCellHtml}</td>
-      <td data-sort="${esc(labelsText.toLowerCase())}">${labelsHtml}</td>
+      <td data-sort="${esc(labelsText.toLowerCase())}" class="labels-cell">${labelsCellHtml}</td>
     </tr>`;
   }).join('\n');
 }
@@ -253,10 +273,11 @@ function processBoard(data, now) {
 
   function cardBrief(c) {
     const labels = (c.labels || []).filter(l => l.name).map(l => ({ name: l.name, color: l.color }));
+    const labelIds = (c.labels || []).map(l => l.id); // unfiltered — includes unnamed labels, for the editor's checked state
     return {
       id: c.idShort, trelloId: c.id, name: c.name, due: c.due, dueComplete: c.dueComplete,
       start: c.start, created: createdFromId(c.id).toISOString(),
-      url: c.shortUrl, labels, supplier: supplierOf(c.name),
+      url: c.shortUrl, labels, labelIds, supplier: supplierOf(c.name),
     };
   }
   function openCardsInName(listName) {
@@ -297,9 +318,11 @@ function processBoard(data, now) {
   const monthlyAvgAll = Object.keys(monthly).sort().map(k => [k, monthly[k].reduce((a,b)=>a+b,0) / monthly[k].length]);
   const monthlyAvgLast14 = monthlyAvgAll.slice(-14);
 
+  const boardLabels = (data.labels || []).map(l => ({ id: l.id, name: l.name, color: l.color }));
+
   return {
     boardName: data.name,
-    decorrerExterno, metalomecanica, planeamentoInterno, workshops, pedreiras,
+    decorrerExterno, metalomecanica, planeamentoInterno, workshops, pedreiras, boardLabels,
     resolution: { count: durations.length, mean, median, p90, monthlyAvgLast14 },
     totals: {
       totalOpen: cards.filter(c => !c.closed).length,
@@ -417,6 +440,68 @@ function wireDueEditing(root) {
 }
 
 // ---------------------------------------------------------------
+// Editable "Etiquetas" (labels) — a popover with every board label as a checkbox;
+// each toggle replaces the card's full label set via a single PUT. Same untested
+// caveat as the due-date editor (no network to Trello from the build environment).
+// ---------------------------------------------------------------
+async function updateCardLabels(trelloId, idLabelsArray, statusEl, chipsDisplayEl, boardLabels) {
+  const { key, token } = getCreds();
+  if (!key || !token) { openCredsModal(); return; }
+  if (statusEl) { statusEl.textContent = 'A gravar…'; statusEl.className = 'due-status saving'; }
+  try {
+    const params = new URLSearchParams({ key, token, idLabels: idLabelsArray.join(',') });
+    const url = `https://api.trello.com/1/cards/${trelloId}?${params.toString()}`;
+    const resp = await fetch(url, { method: 'PUT' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    if (statusEl) {
+      statusEl.textContent = 'Guardado ✓';
+      statusEl.className = 'due-status ok';
+      setTimeout(() => { statusEl.textContent = ''; }, 2500);
+    }
+    if (chipsDisplayEl) {
+      const chosen = boardLabels.filter(l => idLabelsArray.includes(l.id));
+      chipsDisplayEl.innerHTML = chosen.map(labelChip).join('') || '<span class="chips-empty">—</span>';
+    }
+  } catch (err) {
+    console.error(err);
+    if (statusEl) { statusEl.textContent = 'Falha ao gravar'; statusEl.className = 'due-status err'; }
+  }
+}
+
+function wireLabelEditing(root, boardLabels) {
+  const scope = root || document;
+  scope.querySelectorAll('button.labels-edit-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const cell = btn.closest('td.labels-cell');
+      const popover = cell ? cell.querySelector('.labels-popover') : null;
+      const isHidden = popover.hidden;
+      scope.querySelectorAll('.labels-popover').forEach(p => { p.hidden = true; });
+      if (popover) popover.hidden = !isHidden;
+    });
+  });
+  scope.querySelectorAll('.labels-popover input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const popover = cb.closest('.labels-popover');
+      const trelloId = popover.dataset.trelloId;
+      const cell = popover.closest('td.labels-cell');
+      const chipsDisplayEl = cell ? cell.querySelector('.chips-display') : null;
+      const statusEl = popover.querySelector('.due-status');
+      const idLabelsArray = Array.from(popover.querySelectorAll('input[type="checkbox"]:checked')).map(i => i.value);
+      updateCardLabels(trelloId, idLabelsArray, statusEl, chipsDisplayEl, boardLabels);
+    });
+  });
+  // close any open popover on an outside click
+  if (!wireLabelEditing._outsideBound) {
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('.labels-popover') || e.target.closest('.labels-edit-btn')) return;
+      document.querySelectorAll('.labels-popover').forEach(p => { p.hidden = true; });
+    });
+    wireLabelEditing._outsideBound = true;
+  }
+}
+
+// ---------------------------------------------------------------
 // Fetch / cache / credentials / bootstrap — shared by every page
 // ---------------------------------------------------------------
 function setStatus(state, text) {
@@ -458,7 +543,7 @@ async function fetchAndRender(force) {
   }
   setStatus('', 'A atualizar…');
   try {
-    const url = `https://api.trello.com/1/boards/${BOARD_ID}?fields=name,url&lists=all&list_fields=${LIST_FIELDS}&cards=all&card_fields=${CARD_FIELDS}&key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
+    const url = `https://api.trello.com/1/boards/${BOARD_ID}?fields=name,url&lists=all&list_fields=${LIST_FIELDS}&cards=all&card_fields=${CARD_FIELDS}&labels=all&label_fields=${BOARD_LABEL_FIELDS}&key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
     const resp = await fetch(url);
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
@@ -531,6 +616,7 @@ function initPage(activeKey, render) {
     const contentEl = document.getElementById('content');
     wireSorting(contentEl);
     wireDueEditing(contentEl);
+    wireLabelEditing(contentEl, P.boardLabels || []);
   };
   document.getElementById('btnUpdate').addEventListener('click', () => fetchAndRender(true));
   document.getElementById('btnCreds').addEventListener('click', openCredsModal);

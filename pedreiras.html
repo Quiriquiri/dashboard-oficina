@@ -16,7 +16,7 @@ function render(P, now) {
   const sections = P.pedreiras.filter(p => p.cards.length).map(p => `
     <div class="site-block" id="${p.key}">
       <h3>${esc(p.label)} (${p.cards.length})</h3>
-      ${cardTable(p.cards, {now})}
+      ${cardTable(p.cards, {now, boardLabels:P.boardLabels})}
     </div>`).join('');
 
   document.getElementById('content').innerHTML = `

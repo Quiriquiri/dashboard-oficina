@@ -19,10 +19,11 @@ function render(P, now) {
   const sections = P.workshops.map(w => {
     const planBlock = w.planeamentoList ? `
       <div class="subgroup-title">Pendente de planeamento (${w.planeamento.length})</div>
-      ${cardTable(w.planeamento, {now})}
+      <p class="info-note" style="margin-top:0;">Sem data de início (ainda por planear) — "Criado em" e "Dias por planear" mostram há quanto tempo o cartão está à espera</p>
+      ${cardTable(w.planeamento, {showCreated:true, showRunning:true, runningLabel:'Dias por planear', now, boardLabels:P.boardLabels})}
       <div class="subgroup-title" style="margin-top:20px;">A decorrer (${w.decorrer.length})</div>
-      ${cardTable(w.decorrer, {showStart:true, showRunning:true, now})}
-    ` : cardTable(w.decorrer, {showStart:true, showRunning:true, now});
+      ${cardTable(w.decorrer, {showStart:true, showRunning:true, now, boardLabels:P.boardLabels})}
+    ` : cardTable(w.decorrer, {showStart:true, showRunning:true, now, boardLabels:P.boardLabels});
     return `<div class="site-block" id="${w.key}">
       <h3>${esc(w.label)} — ${w.decorrer.length} a decorrer${w.planeamentoList ? ` · ${w.planeamento.length} a aguardar planeamento` : ''}</h3>
       ${planBlock}

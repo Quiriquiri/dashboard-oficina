@@ -79,6 +79,22 @@ button.due-clear:hover { color: var(--critical); }
   background: color-mix(in srgb, var(--critical) 14%, transparent); border-radius: 999px; padding: 2px 7px; margin-left: 4px; }
 .approx { color: var(--text-muted); }
 .chip { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--chip) 16%, transparent); color: var(--text-primary); border: 1px solid color-mix(in srgb, var(--chip) 55%, transparent); margin: 1px 3px 1px 0; }
+.chips-empty { color: var(--text-muted); }
+
+td.labels-cell { position: relative; min-width: 160px; }
+.chips-display { display: inline; }
+button.labels-edit-btn { appearance: none; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-secondary);
+  border-radius: 999px; width: 18px; height: 18px; line-height: 1; font-size: 13px; cursor: pointer; margin-left: 4px; vertical-align: middle; }
+button.labels-edit-btn:hover { color: var(--series-1); border-color: var(--series-1); }
+.labels-popover { position: absolute; z-index: 20; top: 100%; left: 0; margin-top: 4px; min-width: 200px;
+  max-height: 260px; overflow-y: auto;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12); }
+.labels-popover-item { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 400;
+  padding: 5px 4px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.labels-popover-item:hover { background: var(--page-plane); }
+.labels-popover-item input { margin: 0; }
+.labels-popover-footer { margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--grid-line); min-height: 14px; }
 .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--chip); margin-right: 7px; }
 
 .bar-label { font-size: 12px; fill: var(--text-secondary); }

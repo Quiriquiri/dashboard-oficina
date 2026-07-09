@@ -39,6 +39,22 @@ funcionar, o token guardado no painel "Configurar chave/token" precisa de permis
 Um token só de leitura continua a mostrar os dados normalmente, só as alterações ao Prazo é que
 falham (aparece "Falha ao gravar" junto à data).
 
+## Editar etiquetas diretamente no dashboard
+
+Na coluna "Etiquetas" de todas as tabelas há um botão "+" junto às etiquetas já aplicadas. Ao
+clicar, abre um menu com todas as etiquetas existentes no board (caixa de checkboxes) — marcar ou
+desmarcar grava de imediato no Trello (o conjunto completo de etiquetas do cartão é substituído
+pelo que estiver marcado). O menu tem scroll interno quando há muitas etiquetas no board, para não
+ultrapassar o ecrã. Tal como o Prazo, isto precisa do token com permissão de **escrita**.
+
+## Coluna "Dias por planear"
+
+Os cartões que ainda não têm data de início (fila de planeamento — Ligeiros em
+"Planeamento Interno Ligeiros" e todos os cartões de "Planeamento Interno") mostram a coluna
+"Criado em" (data de criação do cartão) e "Dias por planear" (quantos dias já passaram desde essa
+criação). Serve para perceber há quanto tempo um trabalho está à espera de ser planeado, já que
+ainda não tem uma data de início real associada.
+
 ## Nota de privacidade
 
 No plano gratuito do GitHub, uma página do GitHub Pages é sempre publicamente acessível a quem
