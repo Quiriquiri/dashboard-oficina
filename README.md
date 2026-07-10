@@ -89,8 +89,10 @@ ainda não tem uma data de início real associada.
 ## Página "Falta de Peças"
 
 Lista todos os cartões ativos (em qualquer lista do quadro, não só nas secções já cobertas pelas
-outras páginas) que tenham a etiqueta "Falta de Peças". Além das colunas habituais, tem uma coluna
-extra "Com esta etiqueta há" — quanto tempo passou desde que essa etiqueta foi aplicada ao cartão.
+outras páginas) que tenham a etiqueta "Falta de Peças" — exceto os que já estão na lista
+"Concluído", que ficam de fora mesmo que a etiqueta tenha ficado esquecida no cartão. Além das
+colunas habituais, tem uma coluna extra "Com esta etiqueta há" — quanto tempo passou desde que essa
+etiqueta foi aplicada ao cartão.
 
 Essa data vem do histórico de atividade do próprio cartão no Trello (o Trello não a devolve no
 pedido normal do board, por isso a página faz, só para estes cartões, um pedido adicional por

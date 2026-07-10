@@ -16,6 +16,7 @@ const LIST_NAME = {
   decorrerExterno: 'Intervenções Externas DECORRER',
   metalomecanica: 'Metalomecanica',
   planeamentoInterno: 'Planeamento Interno',
+  concluidos: 'Concluído',
 };
 // A Decorrer Interno: cada workshop tem a lista "a decorrer" e, para os Ligeiros, também
 // uma lista própria de trabalhos pendentes a aguardar planeamento.
@@ -318,9 +319,12 @@ function processBoard(data, now) {
   const pedreiras = PEDREIRAS.map(p => ({ ...p, cards: openCardsInName(p.list) }));
 
   // Falta de Peças — cartões ativos com esta etiqueta em QUALQUER lista do board (não só nas
-  // listas seguidas nominalmente acima), para a página dedicada "Falta de Peças".
+  // listas seguidas nominalmente acima), para a página dedicada "Falta de Peças". Excluídos os
+  // cartões já na lista "Concluído" — já foram resolvidos, mesmo que a etiqueta tenha ficado lá.
+  const concluidosId = idByName[LIST_NAME.concluidos];
   const faltaDePecas = cards
-    .filter(c => !c.closed && !isDivider(c.name) && (c.labels || []).some(l => l.name === FALTA_DE_PECAS_LABEL))
+    .filter(c => !c.closed && !isDivider(c.name) && c.idList !== concluidosId
+      && (c.labels || []).some(l => l.name === FALTA_DE_PECAS_LABEL))
     .map(cardBrief);
 
   // resolution stats — over ALL cards on the board with both start & dateCompleted
