@@ -97,6 +97,9 @@ button.card-edit-btn { appearance: none; border: 1px solid var(--border); backgr
   border-radius: 999px; width: 18px; height: 18px; line-height: 1; font-size: 11px; cursor: pointer; margin-left: 6px; vertical-align: middle; }
 button.card-edit-btn:hover { color: var(--series-1); border-color: var(--series-1); }
 .card-members { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.checklist-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text-secondary); margin-left: 6px; vertical-align: middle; }
+.checklist-badge.done { background: color-mix(in srgb, var(--good) 16%, transparent); border-color: color-mix(in srgb, var(--good) 55%, transparent); color: var(--good); }
 .chip { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--chip) 16%, transparent); color: var(--text-primary); border: 1px solid color-mix(in srgb, var(--chip) 55%, transparent); margin: 1px 3px 1px 0; }
 .chips-empty { color: var(--text-muted); }
 
@@ -151,6 +154,10 @@ footer.note { font-size: 11px; color: var(--text-muted); margin-top: 30px; line-
 .modal-checklist { max-height: 160px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
 .modal-checklist label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 400; margin: 0; padding: 4px 2px; }
 .modal-checklist label input { width: auto; margin: 0; }
+.modal-checklist-group { margin-top: 10px; }
+.modal-checklist-group:first-of-type { margin-top: 4px; }
+.modal-checklist-group-title { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.modal-checklist-group-title .count { color: var(--text-muted); font-weight: 400; }
 .archive-row { margin-top: 18px; border-top: 1px solid var(--grid-line); padding-top: 14px; }
 button.btn-danger { appearance: none; border: 1px solid var(--critical); background: var(--surface-2); color: var(--critical);
   border-radius: 8px; padding: 7px 12px; font-size: 13px; cursor: pointer; font-weight: 600; }

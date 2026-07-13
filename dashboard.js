@@ -204,6 +204,11 @@ function labelsEditableCell(card, boardLabels) {
       <div class="labels-popover-footer"><span class="due-status" data-status-for="lbl-${esc(card.trelloId)}"></span></div>
     </div>`;
 }
+function checklistBadge(card) {
+  if (!card.checklistTotal) return '';
+  const done = card.checklistDone === card.checklistTotal;
+  return `<span class="checklist-badge${done ? ' done' : ''}" title="Checklist: ${card.checklistDone}/${card.checklistTotal} concluídos">${card.checklistDone}/${card.checklistTotal}</span>`;
+}
 function runningDaysCell(card, now) {
   const { rd, real } = daysRunning(card, now);
   if (rd === null) return '<td data-sort="-1">—</td>';
@@ -226,7 +231,14 @@ function cardRows(cards, opts) {
   opts = opts || {};
   const now = opts.now;
   let items = cards.slice();
-  if (opts.sortByDue !== false) {
+  if (opts.sortByRunning) {
+    // "mais antigo primeiro": maior "dias a decorrer / dias por planear" primeiro
+    items.sort((a, b) => {
+      const da = daysRunning(a, now).rd, db = daysRunning(b, now).rd;
+      const av = da === null ? -Infinity : da, bv = db === null ? -Infinity : db;
+      return bv - av;
+    });
+  } else if (opts.sortByDue !== false) {
     items.sort((a, b) => {
       const av = a.due === null ? 1 : 0, bv = b.due === null ? 1 : 0;
       if (av !== bv) return av - bv;
@@ -261,7 +273,7 @@ function cardRows(cards, opts) {
     const labelAgeCol = opts.showLabelAge ? `<td class="label-age-cell" data-trello-id="${esc(c.trelloId)}" data-sort="-1">A calcular…</td>` : '';
     const labelsText = c.labels.map(l => l.name).join(', ');
     const labelsCellHtml = labelsEditableCell(c, opts.boardLabels);
-    const editBtn = c.trelloId ? `<button type="button" class="card-edit-btn" data-trello-id="${esc(c.trelloId)}" title="Editar cartão (nome, descrição, lista, membros, arquivar)">✎</button>` : '';
+    const editBtn = c.trelloId ? `<button type="button" class="card-edit-btn" data-trello-id="${esc(c.trelloId)}" title="Editar cartão (nome, descrição, checklist, lista, arquivar)">✎</button>` : '';
     const memberNames = (c.idMembers || []).map(id => {
       const m = (opts.boardMembers || []).find(x => x.id === id);
       return m ? m.fullName : null;
@@ -269,7 +281,7 @@ function cardRows(cards, opts) {
     const membersLine = memberNames.length ? `<div class="card-members">${esc(memberNames.join(', '))}</div>` : '';
     return `<tr>
       <td class="col-id" data-sort="${c.id}">#${c.id}</td>
-      <td data-sort="${esc(c.name.toLowerCase())}"><a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.name)}</a>${editBtn}${membersLine}</td>
+      <td data-sort="${esc(c.name.toLowerCase())}"><a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.name)}</a>${checklistBadge(c)}${editBtn}${membersLine}</td>
       ${createdCol}${startCol}${runningCol}${labelAgeCol}
       <td data-sort="${dueSort}" class="due-cell">${dueCellHtml}</td>
       <td data-sort="${esc(labelsText.toLowerCase())}" class="labels-cell">${labelsCellHtml}</td>
@@ -291,13 +303,26 @@ function processBoard(data, now) {
   (data.lists || []).forEach(l => { idByName[l.name] = l.id; });
   const cards = data.cards || [];
 
+  // Checklists — pedidas à parte (data.checklists, ver fetchAndRender) porque o Trello não as
+  // devolve dentro do fetch normal de cartões do board. Agrupadas aqui por idCard.
+  const checklistsByCard = {};
+  (data.checklists || []).forEach(cl => {
+    const items = (cl.checkItems || []).slice().sort((a, b) => (a.pos || 0) - (b.pos || 0))
+      .map(ci => ({ id: ci.id, name: ci.name, state: ci.state }));
+    (checklistsByCard[cl.idCard] = checklistsByCard[cl.idCard] || []).push({ id: cl.id, name: cl.name, pos: cl.pos || 0, items });
+  });
+  Object.keys(checklistsByCard).forEach(id => checklistsByCard[id].sort((a, b) => a.pos - b.pos));
+
   function cardBrief(c) {
     const labels = (c.labels || []).filter(l => l.name).map(l => ({ name: l.name, color: l.color }));
     const labelIds = (c.labels || []).map(l => l.id); // unfiltered — includes unnamed labels, for the editor's checked state
+    const checklists = checklistsByCard[c.id] || [];
+    const checklistTotal = checklists.reduce((s, cl) => s + cl.items.length, 0);
+    const checklistDone = checklists.reduce((s, cl) => s + cl.items.filter(i => i.state === 'complete').length, 0);
     return {
       id: c.idShort, trelloId: c.id, name: c.name, desc: c.desc || '', due: c.due, dueComplete: c.dueComplete,
       start: c.start, created: createdFromId(c.id).toISOString(), idList: c.idList, idMembers: c.idMembers || [],
-      url: c.shortUrl, labels, labelIds, supplier: supplierOf(c.name),
+      url: c.shortUrl, labels, labelIds, supplier: supplierOf(c.name), checklists, checklistTotal, checklistDone,
     };
   }
   function openCardsInName(listName) {
@@ -580,20 +605,63 @@ function wireLabelEditing(root, boardLabels) {
 }
 
 // ---------------------------------------------------------------
-// "Editar cartão" modal — Nome, Descrição, Lista (mover cartão), Membros, e
-// Arquivar. Opened from the "✎" button next to the card name. All fields save
-// together in a single PUT when "Guardar alterações" is clicked.
+// Toggle de um item de checklist ("avaria resolvida?") — grava direto no Trello via
+// PUT /1/cards/{idCard}/checkItem/{idCheckItem}, com o mesmo padrão de patch da cache
+// local + re-render usado em todo o resto (mas com uma forma de patch própria, porque
+// os itens de checklist não vivem em data.cards — vivem em data.checklists).
+// ---------------------------------------------------------------
+async function toggleCheckItem(trelloId, checkItemId, complete, statusEl) {
+  const { key, token } = getCreds();
+  if (!key || !token) { openCredsModal(); return false; }
+  if (statusEl) { statusEl.textContent = 'A gravar…'; statusEl.className = 'due-status saving'; }
+  try {
+    const params = new URLSearchParams({ key, token, state: complete ? 'complete' : 'incomplete' });
+    const resp = await fetch(`https://api.trello.com/1/cards/${trelloId}/checkItem/${checkItemId}?${params.toString()}`, { method: 'PUT' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    if (statusEl) statusEl.textContent = '';
+    return true;
+  } catch (err) {
+    console.error(err);
+    if (statusEl) { statusEl.textContent = 'Falha ao gravar'; statusEl.className = 'due-status err'; }
+    return false;
+  }
+}
+function patchCachedCheckItem(checkItemId, state) {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return;
+    const obj = JSON.parse(raw);
+    (obj.data.checklists || []).forEach(cl => {
+      (cl.checkItems || []).forEach(ci => { if (ci.id === checkItemId) ci.state = state; });
+    });
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify(obj));
+  } catch (e) { /* ignore */ }
+}
+
+// ---------------------------------------------------------------
+// "Editar cartão" modal — Nome, Descrição, Lista (mover cartão), Início, Checklist, e
+// Arquivar. Opened from the "✎" button next to the card name. Nome/Descrição/Lista/
+// Início gravam juntos num só PUT ao clicar "Guardar alterações"; cada item de
+// checklist grava de imediato ao ser marcado/desmarcado (sem esperar por "Guardar").
 // ---------------------------------------------------------------
 function openCardEditModal(trelloId, P) {
   const card = (P.cardsById || {})[trelloId];
   if (!card) return;
   const lists = P.allLists || [];
-  const members = P.boardMembers || [];
   const listOptions = lists.map(l => `<option value="${esc(l.id)}" ${l.id === card.idList ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
-  const memberItems = members.length ? members.map(m => {
-    const checked = (card.idMembers || []).includes(m.id) ? 'checked' : '';
-    return `<label><input type="checkbox" value="${esc(m.id)}" ${checked}>${esc(m.fullName)}</label>`;
-  }).join('') : '<p class="info-note">Sem membros neste board.</p>';
+  const checklistsHtml = (card.checklists && card.checklists.length) ? card.checklists.map(cl => {
+    const done = cl.items.filter(i => i.state === 'complete').length;
+    const itemsHtml = cl.items.length ? cl.items.map(it => `
+      <label>
+        <input type="checkbox" class="checkitem-cb" data-checklist-id="${esc(cl.id)}" data-checkitem-id="${esc(it.id)}" ${it.state === 'complete' ? 'checked' : ''}>
+        ${esc(it.name)}
+      </label>`).join('') : '<p class="info-note">Sem itens.</p>';
+    return `
+      <div class="modal-checklist-group">
+        <div class="modal-checklist-group-title">${esc(cl.name)} <span class="count">(${done}/${cl.items.length})</span></div>
+        <div class="modal-checklist">${itemsHtml}</div>
+      </div>`;
+  }).join('') : '<p class="info-note">Este cartão não tem checklists.</p>';
 
   document.getElementById('modalRoot').innerHTML = `
     <div class="modal-backdrop" id="cardBackdrop">
@@ -608,8 +676,8 @@ function openCardEditModal(trelloId, P) {
         <select id="editList">${listOptions}</select>
         <label>Início</label>
         <input id="editStart" type="date" value="${card.start ? card.start.substring(0,10) : ''}">
-        <label>Membros</label>
-        <div class="modal-checklist">${memberItems}</div>
+        <label>Checklist</label>
+        ${checklistsHtml}
         <span class="due-status" id="cardEditStatus"></span>
         <div class="row">
           <button class="primary" id="btnSaveCard">Guardar alterações</button>
@@ -634,8 +702,7 @@ function openCardEditModal(trelloId, P) {
     const idList = document.getElementById('editList').value;
     const startVal = document.getElementById('editStart').value;
     const start = startVal ? new Date(startVal + 'T12:00:00Z').toISOString() : null;
-    const idMembers = Array.from(document.querySelectorAll('#modalRoot .modal-checklist input:checked')).map(i => i.value);
-    const ok = await saveCardField(trelloId, { name, desc, idList, start, idMembers }, statusEl);
+    const ok = await saveCardField(trelloId, { name, desc, idList, start }, statusEl);
     if (ok) close();
   };
   document.getElementById('btnArchiveCard').onclick = async () => {
@@ -644,6 +711,24 @@ function openCardEditModal(trelloId, P) {
     const ok = await saveCardField(trelloId, { closed: true }, statusEl);
     if (ok) close();
   };
+  document.querySelectorAll('#modalRoot input.checkitem-cb').forEach(cb => {
+    cb.addEventListener('change', async () => {
+      const checkItemId = cb.dataset.checkitemId;
+      const complete = cb.checked;
+      const statusEl = document.getElementById('cardEditStatus');
+      const ok = await toggleCheckItem(trelloId, checkItemId, complete, statusEl);
+      if (!ok) { cb.checked = !complete; return; }
+      patchCachedCheckItem(checkItemId, complete ? 'complete' : 'incomplete');
+      rerenderFromCache(); // atualiza o badge X/Y na tabela por baixo, sem fechar este modal
+      const group = cb.closest('.modal-checklist-group');
+      if (group) {
+        const boxes = group.querySelectorAll('input.checkitem-cb');
+        const done = Array.from(boxes).filter(b => b.checked).length;
+        const countEl = group.querySelector('.count');
+        if (countEl) countEl.textContent = `(${done}/${boxes.length})`;
+      }
+    });
+  });
 }
 
 function wireCardEditing(root, P) {
@@ -803,9 +888,19 @@ async function fetchAndRender(force) {
   setStatus('', 'A atualizar…');
   try {
     const url = `https://api.trello.com/1/boards/${BOARD_ID}?fields=name,url&lists=all&list_fields=${LIST_FIELDS}&cards=all&card_fields=${CARD_FIELDS}&labels=all&label_fields=${BOARD_LABEL_FIELDS}&members=all&member_fields=${BOARD_MEMBER_FIELDS}&key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
-    const resp = await fetch(url);
+    // checklists vêm de um pedido à parte (endpoint dedicado do board, devolve TODOS os
+    // checklists + itens de uma vez, com o idCard de cada um) — mais eficiente do que pedir
+    // por cartão, e corre em paralelo com o pedido principal do board.
+    const checklistsUrl = `https://api.trello.com/1/boards/${BOARD_ID}/checklists?fields=name,idCard,pos&checkItems=all&checkItem_fields=name,state,pos&key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
+    const [resp, checklistsResp] = await Promise.all([fetch(url), fetch(checklistsUrl)]);
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
+    if (checklistsResp.ok) {
+      data.checklists = await checklistsResp.json();
+    } else {
+      console.error('falha ao ir buscar checklists, HTTP', checklistsResp.status);
+      data.checklists = [];
+    }
     writeCache(data);
     const now = new Date();
     renderCallback(processBoard(data, now), now);
@@ -824,7 +919,7 @@ function openCredsModal() {
       <div class="modal">
         <h3>Ligar ao Trello</h3>
         <p>A key e o token ficam guardados só neste browser (localStorage), partilhados entre todas as páginas deste site, nunca enviados para mais lado nenhum além da API do Trello. Obtém a key em <a href="https://trello.com/power-ups/admin/api-key" target="_blank" rel="noopener">trello.com/power-ups/admin/api-key</a>.</p>
-        <p><strong>Para poder editar cartões</strong> (Prazo, Início, Concluir, Etiquetas, Nome, Descrição, mover de lista, Membros, Arquivar), o token precisa de permissão de escrita — gera-o com este link (substitui SUA_API_KEY pela key acima): <br>
+        <p><strong>Para poder editar cartões</strong> (Prazo, Início, Concluir, Etiquetas, Nome, Descrição, Checklist, mover de lista, Arquivar), o token precisa de permissão de escrita — gera-o com este link (substitui SUA_API_KEY pela key acima): <br>
         <code style="font-size:10px; word-break:break-all;">https://trello.com/1/authorize?expiration=30days&scope=read,write&response_type=token&key=SUA_API_KEY</code><br>
         Um token só de leitura (scope=read) continua a mostrar os dados, mas qualquer alteração falha.</p>
         <label>API Key</label>

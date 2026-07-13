@@ -60,7 +60,7 @@ ultrapassar o ecrã. Tal como o Prazo, isto precisa do token com permissão de *
 cartão mudar de etiqueta numa página agrupada por etiqueta (Planeamento Interno), ele muda logo de
 grupo para refletir a alteração.
 
-## Editar o cartão (nome, descrição, lista, membros, arquivar)
+## Editar o cartão (nome, descrição, lista, checklist, arquivar)
 
 Junto ao nome de cada cartão há um botão "✎" que abre uma janela com:
 
@@ -71,12 +71,23 @@ Junto ao nome de cada cartão há um botão "✎" que abre uma janela com:
   decorrer" correspondente).
 - **Início** — mesma data do ponto anterior, disponível aqui também para os cartões que ainda não
   mostram essa coluna (fila de planeamento).
-- **Membros** — checkboxes com todas as pessoas do board; atribui quem for responsável pelo
-  trabalho.
+- **Checklist** — se o cartão tiver uma ou mais checklists no Trello (por exemplo, a lista de
+  avarias a resolver), aparecem aqui com uma checkbox por item. Marcar/desmarcar grava de imediato
+  (não é preciso clicar em "Guardar alterações" para isto) — dá para ir marcando avarias como
+  resolvidas sem sair do dashboard.
 
-Tudo isto grava junto num só "Guardar alterações". Há ainda um botão separado **"Arquivar
-cartão"** (com confirmação) — o cartão deixa de aparecer no dashboard e nas listas ativas do
-Trello, mas não é apagado (continua acessível e recuperável a partir do próprio Trello).
+Nome, Descrição, Lista e Início gravam juntos ao clicar **"Guardar alterações"**. Há ainda um botão
+separado **"Arquivar cartão"** (com confirmação) — o cartão deixa de aparecer no dashboard e nas
+listas ativas do Trello, mas não é apagado (continua acessível e recuperável a partir do próprio
+Trello).
+
+## Progresso da checklist ("4/8") em cada cartão
+
+Sempre que um cartão tem uma checklist no Trello (por exemplo, uma lista de avarias), aparece um
+selo pequeno junto ao nome com a contagem "feitos/total" (ex: "4/8"). Quando fica completo
+("8/8"), o selo passa a verde — dá para ver de relance quais os cartões totalmente resolvidos ao
+nível da checklist, mesmo sem abrir o cartão. Este selo aparece em todas as páginas com tabelas de
+cartões, não só na de edição.
 
 ## Coluna "Dias por planear"
 
@@ -107,6 +118,13 @@ data de início real.
 
 A tabela começa ordenada pela etiqueta mais antiga primeiro (quem está à espera de peças há mais
 tempo no topo); podes reordenar por qualquer coluna clicando no cabeçalho, como nas outras páginas.
+
+## Ordenação por omissão em "A Decorrer Externo" e "A Decorrer Interno"
+
+Estas duas páginas começam ordenadas do cartão mais antigo para o mais recente — quem está a
+decorrer (ou a aguardar planeamento) há mais tempo aparece primeiro, para ser fácil ver o que está
+parado há mais tempo sem teres de clicar em nada. Como sempre, clicar num cabeçalho de coluna
+reordena a tabela por essa coluna.
 
 ## Nota de privacidade
 
