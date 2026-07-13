@@ -1,14 +1,14 @@
 # Dashboard Oficina — Trello (site multi-página)
 
-Site estático com 6 páginas que se ligam diretamente à API do Trello a partir do browser de quem
+Site estático com 8 páginas que se ligam diretamente à API do Trello a partir do browser de quem
 o abre. Nenhum dado do Trello fica guardado no código — cada pessoa que abre o site introduz a
 própria API key + token (ficam só no `localStorage` do respetivo browser, partilhados entre todas
 as páginas do mesmo site).
 
 Páginas: Visão Geral (`index.html`), A Decorrer Externo, A Decorrer Interno (Ligeiros / Pesados /
 Máquinas, com sub-secção de "pendente de planeamento" para os Ligeiros), Pedreiras, Metalomecânica,
-Planeamento Interno, Falta de Peças. Os gráficos da Visão Geral têm barras clicáveis que levam
-diretamente à secção correspondente na página de detalhe.
+Planeamento Interno, Falta de Peças, Pedidos de Peças. Os gráficos da Visão Geral têm barras
+clicáveis que levam diretamente à secção correspondente na página de detalhe.
 
 ## Publicar no GitHub Pages (sem usar a linha de comandos)
 
@@ -16,8 +16,9 @@ diretamente à secção correspondente na página de detalhe.
    privacidade abaixo). Nome sugerido: `dashboard-oficina`.
 2. Dentro do repositório, clica em **Add file → Upload files** e arrasta TODOS os ficheiros deste
    pacote (`index.html`, `decorrer-externo.html`, `decorrer-interno.html`, `pedreiras.html`,
-   `metalomecanica.html`, `planeamento-interno.html`, `dashboard.js`, `styles.css`) — têm de ficar
-   todos na raiz do repositório, uns ao lado dos outros.
+   `metalomecanica.html`, `planeamento-interno.html`, `falta-de-pecas.html`, `pedidos-pecas.html`,
+   `dashboard.js`, `styles.css`) — têm de ficar todos na raiz do repositório, uns ao lado dos
+   outros.
 3. Faz **Commit changes**.
 4. Vai a **Settings → Pages**. Em "Build and deployment", escolhe **Deploy from a branch**,
    branch `main`, pasta `/ (root)`. Grava.
@@ -148,6 +149,24 @@ for atualizado — não é preciso fazer mais nada do lado do dashboard.
 **Nota**: para esta parte funcionar, a conta Trello do key/token configurado precisa de
 acesso de leitura ao quadro "Pedidos Peças" também (não só ao OFICINA) — o painel
 "Configurar chave/token" lembra isto.
+
+## Página "Pedidos de Peças" — pesquisa rápida por nº de equipamento
+
+Página nova, independente das outras: lista TODOS os pedidos de material ativos no quadro
+"Pedidos Peças" (não só os que já têm um cartão de OFICINA correspondente), com uma caixa de
+pesquisa no topo. Escrever um número na caixa filtra a tabela na hora — a pesquisa aceita
+correspondência parcial (escrever "403" encontra "4039", por exemplo), para não ser preciso saber
+o número exato de cor.
+
+Cada linha mostra o nº de equipamento, o nome do pedido (com link direto para o cartão em Pedidos
+Peças), o estado atual (o mesmo selo colorido usado nas outras páginas), a data de chegada quando
+aplicável ("Mat. Encom./Aguarda Rec.") e, quando existir, um link para o cartão de OFICINA
+correspondente (útil para ir diretamente ver o equipamento a partir de um pedido). Um pedido cujo
+equipamento ainda não tem cartão de OFICINA associado (ou cujo campo "Nº Equipamento" ainda não
+foi preenchido do lado de OFICINA) aparece na mesma, só sem esse link.
+
+Sem texto na caixa de pesquisa, a tabela mostra tudo, ordenada por nº de equipamento — tal como nas
+outras páginas, também dá para reordenar clicando num cabeçalho de coluna.
 
 ## Ordenação por omissão em "A Decorrer Externo" e "A Decorrer Interno"
 

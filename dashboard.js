@@ -96,6 +96,7 @@ const PAGES = [
   { key: 'metalomecanica', file: 'metalomecanica.html', label: 'Metalomecânica' },
   { key: 'planeamento-interno', file: 'planeamento-interno.html', label: 'Planeamento Interno' },
   { key: 'falta-de-pecas', file: 'falta-de-pecas.html', label: 'Falta de Peças' },
+  { key: 'pedidos-pecas', file: 'pedidos-pecas.html', label: 'Pedidos de Peças' },
 ];
 
 // ---------------------------------------------------------------
@@ -346,6 +347,66 @@ function cardTable(cards, opts) {
 }
 
 // ---------------------------------------------------------------
+// Página "Pedidos de Peças" — pesquisa rápida, por nº de equipamento, de todos os pedidos
+// de material ativos no quadro "Pedidos Peças" (P.pedidosList, ver processBoard). Não usa
+// cardTable/cardRows porque as linhas aqui são pedidos de material, não cartões de OFICINA.
+// ---------------------------------------------------------------
+function pedidosSearchRows(list) {
+  const items = list.slice().sort((a, b) => (parseInt(a.equipNum, 10) || 0) - (parseInt(b.equipNum, 10) || 0));
+  return items.map(r => {
+    const dueText = r.showDue && r.due ? fmtDate(r.due) : '—';
+    const dueSort = r.showDue && r.due ? r.due.substring(0, 10) : NO_DATE_SORT;
+    const oficinaHtml = r.oficinaCard
+      ? `<a href="${esc(r.oficinaCard.url)}" target="_blank" rel="noopener">${esc(r.oficinaCard.name)}</a>`
+      : '<span class="chips-empty">—</span>';
+    return `<tr data-equip="${esc(r.equipNum)}">
+      <td class="col-id" data-sort="${parseInt(r.equipNum, 10) || 0}">${esc(r.equipNum)}</td>
+      <td data-sort="${esc(r.name.toLowerCase())}"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.name)}</a></td>
+      <td data-sort="${esc(r.label.toLowerCase())}"><span class="material-chip ${r.cls}">${esc(r.label)}</span></td>
+      <td data-sort="${dueSort}">${dueText}</td>
+      <td data-sort="${r.oficinaCard ? esc(r.oficinaCard.name.toLowerCase()) : ''}">${oficinaHtml}</td>
+    </tr>`;
+  }).join('\n');
+}
+function pedidosSearchTable(list) {
+  if (!list.length) return '<p class="info-note">Sem pedidos de material encontrados no quadro "Pedidos Peças" (ou ainda sem acesso a esse quadro — ver "Configurar chave/token").</p>';
+  return `<table id="pedidosSearchTable"><thead><tr>
+      <th data-type="num">Nº Equipamento</th>
+      <th data-type="text">Pedido</th>
+      <th data-type="text">Estado</th>
+      <th data-type="text">Chega / Prazo</th>
+      <th data-type="text">Cartão OFICINA</th>
+    </tr></thead><tbody>${pedidosSearchRows(list)}</tbody></table>`;
+}
+// Filtra as linhas já renderizadas à medida que se escreve na caixa de pesquisa (só dígitos
+// contam para a pesquisa — corresponde parcialmente, "403" encontra "4039"). Chamada pela
+// própria página depois de render(), tal como wireLabelAgeing em Falta de Peças.
+function wirePedidosSearch(root) {
+  const scope = root || document;
+  const input = scope.querySelector('#pedidosSearchInput');
+  const table = scope.querySelector('#pedidosSearchTable');
+  const countEl = scope.querySelector('#pedidosSearchCount');
+  if (!input || !table) return;
+  const rows = Array.from(table.querySelectorAll('tbody tr'));
+  function apply() {
+    const q = input.value.trim().replace(/\D/g, '');
+    let shown = 0;
+    rows.forEach(row => {
+      const match = !q || (row.dataset.equip || '').includes(q);
+      row.style.display = match ? '' : 'none';
+      if (match) shown++;
+    });
+    if (countEl) {
+      countEl.textContent = q
+        ? `${shown} pedido(s) encontrado(s) para "${input.value.trim()}"`
+        : `${rows.length} pedido(s) no total`;
+    }
+  }
+  input.addEventListener('input', apply);
+  apply();
+}
+
+// ---------------------------------------------------------------
 // Process raw Trello board JSON into the shape the renderers need.
 // Lists are matched by NAME — a list not found on the board yields an empty array
 // (never crashes), so a renamed/missing list just shows 0 cards instead of breaking.
@@ -385,7 +446,10 @@ function processBoard(data, now) {
 
   // Pedidos de material (quadro "Pedidos Peças") agrupados por nº de equipamento, extraído
   // do texto da descrição ("Nº Equipamento: 4039"). Só cartões ativos (não arquivados).
+  // `pedidosList` é a mesma informação em lista plana (todos os pedidos, com o nº de
+  // equipamento em cada item) — usada pela página de pesquisa "Pedidos de Peças".
   const pedidosByEquip = {};
+  const pedidosList = [];
   const pedidosBoard = data.pedidosBoard;
   if (pedidosBoard) {
     const pedidosListNameById = {};
@@ -396,9 +460,11 @@ function processBoard(data, now) {
       if (!num) return;
       const listName = pedidosListNameById[c.idList] || '';
       const meta = PEDIDOS_STATUS_META[listName] || { label: listName || '(lista desconhecida)', cls: 'status-neutral' };
-      (pedidosByEquip[num] = pedidosByEquip[num] || []).push({
-        name: c.name, url: c.shortUrl, due: c.due, label: meta.label, cls: meta.cls, showDue: !!meta.showDue,
-      });
+      const req = {
+        equipNum: num, name: c.name, url: c.shortUrl, due: c.due, label: meta.label, cls: meta.cls, showDue: !!meta.showDue,
+      };
+      (pedidosByEquip[num] = pedidosByEquip[num] || []).push(req);
+      pedidosList.push(req);
     });
   }
 
@@ -477,10 +543,23 @@ function processBoard(data, now) {
     .flat()
     .forEach(c => { cardsById[c.trelloId] = c; });
 
+  // Liga cada pedido de material de volta ao cartão de OFICINA correspondente (se existir e
+  // já tiver o campo "Nº Equipamento" preenchido) — usado como link extra na página de
+  // pesquisa "Pedidos de Peças". Um nº de equipamento sem cartão de OFICINA correspondente
+  // (por exemplo, ainda por preencher, ou um equipamento sem trabalho em curso) fica sem
+  // este link, sem problema.
+  const oficinaCardByEquip = {};
+  Object.values(cardsById).forEach(c => {
+    if (c.equipNum && !oficinaCardByEquip[c.equipNum]) {
+      oficinaCardByEquip[c.equipNum] = { name: c.name, url: c.url, trelloId: c.trelloId };
+    }
+  });
+  pedidosList.forEach(r => { r.oficinaCard = oficinaCardByEquip[r.equipNum] || null; });
+
   return {
     boardName: data.name,
     decorrerExterno, metalomecanica, planeamentoInterno, workshops, pedreiras, faltaDePecas, boardLabels,
-    boardMembers, allLists, cardsById,
+    boardMembers, allLists, cardsById, pedidosList,
     resolution: { count: durations.length, mean, median, p90, monthlyAvgLast14 },
     totals: {
       totalOpen: cards.filter(c => !c.closed).length,

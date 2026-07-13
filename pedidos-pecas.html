@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Oficina — Pedidos de Peças</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap"><div id="app"></div></div>
+<script src="dashboard.js"></script>
+<script>
+function render(P, now) {
+  const list = P.pedidosList || [];
+  document.getElementById('content').innerHTML = `
+    <div class="kpi-row">
+      <div class="stat-tile"><div class="label">Pedidos ativos</div><div class="value">${list.length}</div></div>
+      <div class="stat-tile"><div class="label">Equipamentos distintos</div><div class="value">${new Set(list.map(r => r.equipNum)).size}</div></div>
+    </div>
+    <section class="card">
+      <h2>Pedidos de Peças</h2>
+      <p class="desc">Pesquisa rápida, por nº de equipamento, de todos os pedidos de material ativos no quadro "Pedidos Peças" · liga-se ao cartão de OFICINA correspondente quando o campo "Nº Equipamento" já estiver preenchido lá</p>
+      <div class="search-box">
+        <input type="text" id="pedidosSearchInput" placeholder="Pesquisar por nº de equipamento (ex: 4039)" inputmode="numeric">
+        <span class="count" id="pedidosSearchCount"></span>
+      </div>
+      ${pedidosSearchTable(list)}
+    </section>
+  `;
+  wirePedidosSearch(document.getElementById('content'));
+}
+initPage('pedidos-pecas', render);
+</script>
+</body>
+</html>
