@@ -17,8 +17,8 @@ clicáveis que levam diretamente à secção correspondente na página de detalh
 2. Dentro do repositório, clica em **Add file → Upload files** e arrasta TODOS os ficheiros deste
    pacote (`index.html`, `decorrer-externo.html`, `decorrer-interno.html`, `pedreiras.html`,
    `metalomecanica.html`, `planeamento-interno.html`, `falta-de-pecas.html`, `pedidos-pecas.html`,
-   `dashboard.js`, `styles.css`) — têm de ficar todos na raiz do repositório, uns ao lado dos
-   outros.
+   `dashboard.js`, `styles.css`, `favicon.ico`) — têm de ficar todos na raiz do repositório, uns
+   ao lado dos outros.
 3. Faz **Commit changes**.
 4. Vai a **Settings → Pages**. Em "Build and deployment", escolhe **Deploy from a branch**,
    branch `main`, pasta `/ (root)`. Grava.
@@ -167,6 +167,15 @@ foi preenchido do lado de OFICINA) aparece na mesma, só sem esse link.
 
 Sem texto na caixa de pesquisa, a tabela mostra tudo, ordenada por nº de equipamento — tal como nas
 outras páginas, também dá para reordenar clicando num cabeçalho de coluna.
+
+## Favicon (ícone do site na aba do browser)
+
+O ficheiro `favicon.ico` (na raiz do pacote, ao lado dos `.html`) é o ícone que aparece na aba do
+browser e nos separadores/marcadores — pedido pelo João a 13/07/2026. Já vem ligado nas 8 páginas
+(`<link rel="icon" href="favicon.ico">` no `<head>` de cada uma), por isso só é preciso subir o
+ficheiro `favicon.ico` para a raiz do repositório junto com os outros — nenhuma outra alteração é
+necessária. Se um dia quiseres trocar por outro ícone, basta substituir este ficheiro pelo novo
+(mantendo o mesmo nome `favicon.ico`) e voltar a fazer upload — não é preciso mexer no HTML.
 
 ## Ordenação por omissão em "A Decorrer Externo" e "A Decorrer Interno"
 
