@@ -33,6 +33,50 @@ const PEDREIRAS = [
   { key: 'moita-do-poco', label: 'Moita do Poço', list: 'S.E. Oficina Moita do Poço' },
 ];
 
+// ---------------------------------------------------------------
+// Cruzamento com o quadro "Pedidos Peças" — estado dos pedidos de material por
+// equipamento. Ligação entre os dois quadros:
+//   - Em OFICINA, o campo personalizado "Nº Equipamento" (Custom Field) tem o número.
+//   - Em Pedidos Peças, o mesmo número vem escrito na descrição ("Nº Equipamento: 4039").
+// O João está a preencher o campo personalizado nos cartões existentes aos poucos — até
+// isso estar feito, os cartões sem o campo preenchido simplesmente não mostram nenhum
+// pedido associado (não é erro, é falta de dado ainda).
+// ---------------------------------------------------------------
+const PEDIDOS_BOARD_ID = 'KXSNHg6h';
+const PEDIDOS_CARD_FIELDS = 'name,desc,due,idList,closed,shortUrl,idShort';
+const EQUIPAMENTO_FIELD_NAME = 'Nº Equipamento';
+const PEDIDOS_LIST_NAME = {
+  aComprar: 'A Comprar',
+  aguardarCotacao: 'A Aguardar Cotação',
+  aguardarInfoManutencao: 'Aguardar Informação Manutenção',
+  respondidoEQM: 'Respondido por EQM',
+  encomendado: 'Mat. Encom./Aguarda Rec.',
+  levantado: 'Material Levantado',
+};
+// label/estilo mostrado no dashboard para cada lista do quadro Pedidos Peças; qualquer
+// lista não reconhecida (renomeada, ou nova) cai num estilo neutro com o próprio nome.
+const PEDIDOS_STATUS_META = {
+  [PEDIDOS_LIST_NAME.aComprar]: { label: 'A comprar', cls: 'status-neutral' },
+  [PEDIDOS_LIST_NAME.aguardarCotacao]: { label: 'Aguarda cotação', cls: 'status-neutral' },
+  [PEDIDOS_LIST_NAME.aguardarInfoManutencao]: { label: 'Aguarda info EQM', cls: 'status-attention' },
+  [PEDIDOS_LIST_NAME.respondidoEQM]: { label: 'Aguarda Compras', cls: 'status-progress' },
+  [PEDIDOS_LIST_NAME.encomendado]: { label: 'Encomendado', cls: 'status-ordered', showDue: true },
+  [PEDIDOS_LIST_NAME.levantado]: { label: 'Entregue', cls: 'status-done' },
+};
+// aceita "Nº Equipamento", "N.º Equipamento", "N.º. Equipamento", "No Equipamento",
+// "N° Equipamento", em qualquer combinação de ".", "º", "°", "o" e espaços entre o "N" e
+// "Equipamento", com ou sem ":" a seguir — extrai a sequência de 3 a 6 dígitos que se segue.
+const EQUIP_NUM_RE = /n[\s.°º:o]{0,6}equipamento\s*:?\s*#?\s*(\d{3,6})/i;
+function normalizeEquipNum(raw) {
+  const digits = String(raw == null ? '' : raw).replace(/\D/g, '');
+  if (!digits) return null;
+  return String(parseInt(digits, 10)); // tira zeros à esquerda, para "04039" == "4039"
+}
+function equipNumFromDesc(desc) {
+  const m = EQUIP_NUM_RE.exec(desc || '');
+  return m ? normalizeEquipNum(m[1]) : null;
+}
+
 const CAT_BLUE = '#2a78d6', CAT_AQUA = '#1baf7a', CAT_YELLOW = '#eda100';
 const LABEL_COLOR_MAP = {
   lime: '#0ca30c', orange: '#eb6834', orange_dark: '#d95926',
@@ -209,6 +253,14 @@ function checklistBadge(card) {
   const done = card.checklistDone === card.checklistTotal;
   return `<span class="checklist-badge${done ? ' done' : ''}" title="Checklist: ${card.checklistDone}/${card.checklistTotal} concluídos">${card.checklistDone}/${card.checklistTotal}</span>`;
 }
+function materialRequestChip(r) {
+  const due = r.showDue && r.due ? ` · chega ${fmtDate(r.due)}` : '';
+  return `<a href="${esc(r.url)}" target="_blank" rel="noopener" class="material-chip ${r.cls}" title="${esc(r.name)}">${esc(r.label)}${due}</a>`;
+}
+function materialRequestsLine(card) {
+  if (!card.materialRequests || !card.materialRequests.length) return '';
+  return `<div class="material-requests">${card.materialRequests.map(materialRequestChip).join('')}</div>`;
+}
 function runningDaysCell(card, now) {
   const { rd, real } = daysRunning(card, now);
   if (rd === null) return '<td data-sort="-1">—</td>';
@@ -281,7 +333,7 @@ function cardRows(cards, opts) {
     const membersLine = memberNames.length ? `<div class="card-members">${esc(memberNames.join(', '))}</div>` : '';
     return `<tr>
       <td class="col-id" data-sort="${c.id}">#${c.id}</td>
-      <td data-sort="${esc(c.name.toLowerCase())}"><a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.name)}</a>${checklistBadge(c)}${editBtn}${membersLine}</td>
+      <td data-sort="${esc(c.name.toLowerCase())}"><a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.name)}</a>${checklistBadge(c)}${editBtn}${membersLine}${materialRequestsLine(c)}</td>
       ${createdCol}${startCol}${runningCol}${labelAgeCol}
       <td data-sort="${dueSort}" class="due-cell">${dueCellHtml}</td>
       <td data-sort="${esc(labelsText.toLowerCase())}" class="labels-cell">${labelsCellHtml}</td>
@@ -313,16 +365,56 @@ function processBoard(data, now) {
   });
   Object.keys(checklistsByCard).forEach(id => checklistsByCard[id].sort((a, b) => a.pos - b.pos));
 
+  // Nº de equipamento por cartão de OFICINA — vem do campo personalizado "Nº Equipamento"
+  // (data.oficinaCustomFieldDefs + data.oficinaCardCustomFieldItems, ver fetchAndRender).
+  // Cartões cujo campo ainda não foi preenchido (migração em curso) ficam sem número —
+  // simplesmente não aparece nenhum pedido de material associado, sem erro.
+  const equipField = (data.oficinaCustomFieldDefs || [])
+    .find(f => (f.name || '').trim().toLowerCase() === EQUIPAMENTO_FIELD_NAME.toLowerCase());
+  const equipNumByCardId = {};
+  if (equipField) {
+    (data.oficinaCardCustomFieldItems || []).forEach(c => {
+      (c.customFieldItems || []).forEach(item => {
+        if (item.idCustomField !== equipField.id) return;
+        const raw = item.value && (item.value.text ?? item.value.number);
+        const num = normalizeEquipNum(raw);
+        if (num) equipNumByCardId[c.id] = num;
+      });
+    });
+  }
+
+  // Pedidos de material (quadro "Pedidos Peças") agrupados por nº de equipamento, extraído
+  // do texto da descrição ("Nº Equipamento: 4039"). Só cartões ativos (não arquivados).
+  const pedidosByEquip = {};
+  const pedidosBoard = data.pedidosBoard;
+  if (pedidosBoard) {
+    const pedidosListNameById = {};
+    (pedidosBoard.lists || []).forEach(l => { pedidosListNameById[l.id] = l.name; });
+    (pedidosBoard.cards || []).forEach(c => {
+      if (c.closed) return;
+      const num = equipNumFromDesc(c.desc);
+      if (!num) return;
+      const listName = pedidosListNameById[c.idList] || '';
+      const meta = PEDIDOS_STATUS_META[listName] || { label: listName || '(lista desconhecida)', cls: 'status-neutral' };
+      (pedidosByEquip[num] = pedidosByEquip[num] || []).push({
+        name: c.name, url: c.shortUrl, due: c.due, label: meta.label, cls: meta.cls, showDue: !!meta.showDue,
+      });
+    });
+  }
+
   function cardBrief(c) {
     const labels = (c.labels || []).filter(l => l.name).map(l => ({ name: l.name, color: l.color }));
     const labelIds = (c.labels || []).map(l => l.id); // unfiltered — includes unnamed labels, for the editor's checked state
     const checklists = checklistsByCard[c.id] || [];
     const checklistTotal = checklists.reduce((s, cl) => s + cl.items.length, 0);
     const checklistDone = checklists.reduce((s, cl) => s + cl.items.filter(i => i.state === 'complete').length, 0);
+    const equipNum = equipNumByCardId[c.id] || null;
+    const materialRequests = equipNum ? (pedidosByEquip[equipNum] || []) : [];
     return {
       id: c.idShort, trelloId: c.id, name: c.name, desc: c.desc || '', due: c.due, dueComplete: c.dueComplete,
       start: c.start, created: createdFromId(c.id).toISOString(), idList: c.idList, idMembers: c.idMembers || [],
       url: c.shortUrl, labels, labelIds, supplier: supplierOf(c.name), checklists, checklistTotal, checklistDone,
+      equipNum, materialRequests,
     };
   }
   function openCardsInName(listName) {
@@ -892,7 +984,17 @@ async function fetchAndRender(force) {
     // checklists + itens de uma vez, com o idCard de cada um) — mais eficiente do que pedir
     // por cartão, e corre em paralelo com o pedido principal do board.
     const checklistsUrl = `https://api.trello.com/1/boards/${BOARD_ID}/checklists?fields=name,idCard,pos&checkItems=all&checkItem_fields=name,state,pos&key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
-    const [resp, checklistsResp] = await Promise.all([fetch(url), fetch(checklistsUrl)]);
+    // Cruzamento com "Pedidos Peças" (ver constantes no topo do ficheiro): 3 pedidos extra,
+    // todos em paralelo com os dois de cima. Cada um falha de forma isolada (try/catch
+    // próprio) — se algum destes falhar (ex.: token sem acesso ao quadro Pedidos Peças, ou
+    // o campo personalizado ainda não existir), o resto do dashboard continua a funcionar
+    // normalmente, só sem a informação de estado de material.
+    const customFieldDefsUrl = `https://api.trello.com/1/boards/${BOARD_ID}/customFields?key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
+    const cardCustomFieldItemsUrl = `https://api.trello.com/1/boards/${BOARD_ID}/cards?filter=all&fields=id&customFieldItems=true&key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
+    const pedidosBoardUrl = `https://api.trello.com/1/boards/${PEDIDOS_BOARD_ID}?fields=name,url&lists=all&list_fields=name,closed&cards=open&card_fields=${PEDIDOS_CARD_FIELDS}&key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
+    const [resp, checklistsResp, customFieldDefsResp, cardCustomFieldItemsResp, pedidosBoardResp] = await Promise.all([
+      fetch(url), fetch(checklistsUrl), fetch(customFieldDefsUrl), fetch(cardCustomFieldItemsUrl), fetch(pedidosBoardUrl),
+    ]);
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     if (checklistsResp.ok) {
@@ -901,6 +1003,15 @@ async function fetchAndRender(force) {
       console.error('falha ao ir buscar checklists, HTTP', checklistsResp.status);
       data.checklists = [];
     }
+    try {
+      data.oficinaCustomFieldDefs = customFieldDefsResp.ok ? await customFieldDefsResp.json() : [];
+    } catch (e) { console.error('falha ao ir buscar campos personalizados de OFICINA', e); data.oficinaCustomFieldDefs = []; }
+    try {
+      data.oficinaCardCustomFieldItems = cardCustomFieldItemsResp.ok ? await cardCustomFieldItemsResp.json() : [];
+    } catch (e) { console.error('falha ao ir buscar valores dos campos personalizados de OFICINA', e); data.oficinaCardCustomFieldItems = []; }
+    try {
+      data.pedidosBoard = pedidosBoardResp.ok ? await pedidosBoardResp.json() : null;
+    } catch (e) { console.error('falha ao ir buscar o quadro Pedidos Peças', e); data.pedidosBoard = null; }
     writeCache(data);
     const now = new Date();
     renderCallback(processBoard(data, now), now);
@@ -919,6 +1030,7 @@ function openCredsModal() {
       <div class="modal">
         <h3>Ligar ao Trello</h3>
         <p>A key e o token ficam guardados só neste browser (localStorage), partilhados entre todas as páginas deste site, nunca enviados para mais lado nenhum além da API do Trello. Obtém a key em <a href="https://trello.com/power-ups/admin/api-key" target="_blank" rel="noopener">trello.com/power-ups/admin/api-key</a>.</p>
+        <p>Desde que o dashboard cruza informação com o quadro "Pedidos Peças", a mesma conta Trello à qual pertence este key/token precisa de ter acesso de leitura a esse quadro também (não só ao OFICINA) — caso contrário, essa parte fica simplesmente sem dados, sem afetar o resto.</p>
         <p><strong>Para poder editar cartões</strong> (Prazo, Início, Concluir, Etiquetas, Nome, Descrição, Checklist, mover de lista, Arquivar), o token precisa de permissão de escrita — gera-o com este link (substitui SUA_API_KEY pela key acima): <br>
         <code style="font-size:10px; word-break:break-all;">https://trello.com/1/authorize?expiration=30days&scope=read,write&response_type=token&key=SUA_API_KEY</code><br>
         Um token só de leitura (scope=read) continua a mostrar os dados, mas qualquer alteração falha.</p>

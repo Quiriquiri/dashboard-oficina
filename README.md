@@ -119,6 +119,36 @@ data de início real.
 A tabela começa ordenada pela etiqueta mais antiga primeiro (quem está à espera de peças há mais
 tempo no topo); podes reordenar por qualquer coluna clicando no cabeçalho, como nas outras páginas.
 
+## Estado do pedido de material (cruzamento com o quadro "Pedidos Peças")
+
+Sempre que um cartão de equipamento (em qualquer página do dashboard) tiver o campo
+personalizado **"Nº Equipamento"** preenchido no Trello, aparece por baixo do nome um ou
+mais selos coloridos com o estado do(s) pedido(s) de material desse equipamento no quadro
+"Pedidos Peças":
+
+- **A comprar** / **Aguarda cotação** — cinzento, ainda numa fase inicial.
+- **Aguarda info EQM** — laranja, pedido à espera de resposta da manutenção.
+- **Aguarda Compras** — azul, já respondido pela EQM, à espera de ação das Compras.
+- **Encomendado · chega DD/MM/AAAA** — azul mais forte, já encomendado, com a data prevista
+  de chegada (vem do campo "Prazo" do cartão em Pedidos Peças).
+- **Entregue** — verde, material já levantado.
+
+Se houver mais do que um pedido de material para o mesmo equipamento (por exemplo, uma peça
+já entregue e outra ainda em cotação), aparecem todos os selos, um por pedido. Cada selo é
+um link direto para o respetivo cartão em "Pedidos Peças". Se um equipamento não tiver
+nenhum pedido associado (ou o campo "Nº Equipamento" ainda não estiver preenchido nesse
+cartão), simplesmente não aparece selo nenhum — não é erro.
+
+A ligação entre os dois quadros é feita pelo número de equipamento: em OFICINA vem do campo
+personalizado "Nº Equipamento" (Custom Field), em Pedidos Peças vem do texto da descrição
+("Nº Equipamento: 4039"). Como o João está a preencher o campo personalizado nos cartões
+já existentes aos poucos, os selos vão aparecendo progressivamente à medida que cada cartão
+for atualizado — não é preciso fazer mais nada do lado do dashboard.
+
+**Nota**: para esta parte funcionar, a conta Trello do key/token configurado precisa de
+acesso de leitura ao quadro "Pedidos Peças" também (não só ao OFICINA) — o painel
+"Configurar chave/token" lembra isto.
+
 ## Ordenação por omissão em "A Decorrer Externo" e "A Decorrer Interno"
 
 Estas duas páginas começam ordenadas do cartão mais antigo para o mais recente — quem está a
