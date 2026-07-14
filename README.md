@@ -1,14 +1,14 @@
 # Dashboard Oficina — Trello (site multi-página)
 
-Site estático com 8 páginas que se ligam diretamente à API do Trello a partir do browser de quem
+Site estático com 9 páginas que se ligam diretamente à API do Trello a partir do browser de quem
 o abre. Nenhum dado do Trello fica guardado no código — cada pessoa que abre o site introduz a
 própria API key + token (ficam só no `localStorage` do respetivo browser, partilhados entre todas
 as páginas do mesmo site).
 
 Páginas: Visão Geral (`index.html`), A Decorrer Externo, A Decorrer Interno (Ligeiros / Pesados /
 Máquinas, com sub-secção de "pendente de planeamento" para os Ligeiros), Pedreiras, Metalomecânica,
-Planeamento Interno, Falta de Peças, Pedidos de Peças. Os gráficos da Visão Geral têm barras
-clicáveis que levam diretamente à secção correspondente na página de detalhe.
+Planeamento Interno, Gantt Mecânicos, Falta de Peças, Pedidos de Peças. Os gráficos da Visão Geral
+têm barras clicáveis que levam diretamente à secção correspondente na página de detalhe.
 
 ## Publicar no GitHub Pages (sem usar a linha de comandos)
 
@@ -16,9 +16,9 @@ clicáveis que levam diretamente à secção correspondente na página de detalh
    privacidade abaixo). Nome sugerido: `dashboard-oficina`.
 2. Dentro do repositório, clica em **Add file → Upload files** e arrasta TODOS os ficheiros deste
    pacote (`index.html`, `decorrer-externo.html`, `decorrer-interno.html`, `pedreiras.html`,
-   `metalomecanica.html`, `planeamento-interno.html`, `falta-de-pecas.html`, `pedidos-pecas.html`,
-   `dashboard.js`, `styles.css`, `favicon.ico`) — têm de ficar todos na raiz do repositório, uns
-   ao lado dos outros.
+   `metalomecanica.html`, `planeamento-interno.html`, `gantt-mecanicos.html`, `falta-de-pecas.html`,
+   `pedidos-pecas.html`, `dashboard.js`, `styles.css`, `favicon.ico`) — têm de ficar todos na raiz
+   do repositório, uns ao lado dos outros.
 3. Faz **Commit changes**.
 4. Vai a **Settings → Pages**. Em "Build and deployment", escolhe **Deploy from a branch**,
    branch `main`, pasta `/ (root)`. Grava.
@@ -167,6 +167,43 @@ foi preenchido do lado de OFICINA) aparece na mesma, só sem esse link.
 
 Sem texto na caixa de pesquisa, a tabela mostra tudo, ordenada por nº de equipamento — tal como nas
 outras páginas, também dá para reordenar clicando num cabeçalho de coluna.
+
+## Página "Gantt Mecânicos" — mapa de atribuição por mecânico
+
+Página nova, pedida pelo João a 13-14/07/2026: um mecânico por linha (com sub-linhas se tiver
+vários serviços em simultâneo), colunas 2ªf a Sáb repetidas por 3 ou 4 semanas (escolha no
+topo), cada barra é um cartão do Trello posicionado pelo Início/Prazo reais.
+
+**Cartões elegíveis**: a união dos cartões já seguidos nas páginas A Decorrer Externo, A Decorrer
+Interno (a decorrer + a aguardar planeamento, nas 3 oficinas), Metalomecânica, Pedreiras e
+Planeamento Interno. "Falta de Peças" fica de fora (confirmado pelo João) — não é lista própria, é
+uma etiqueta que pode calhar num cartão de qualquer uma das listas acima, e esse cartão continua a
+aparecer normalmente através da lista onde realmente está.
+
+**Cor da barra**: por número de equipamento (o campo personalizado "Nº Equipamento" se já estiver
+preenchido, senão o primeiro número de 3 a 6 dígitos encontrado no nome do cartão) — o mesmo
+equipamento fica sempre com a mesma cor em qualquer lado do mapa, sem precisar de legenda.
+
+**Mecânico atribuído**: lê e escreve o campo personalizado **"Atribuído a"** (dropdown) que já
+existe em todos os cartões de OFICINA. A lista de mecânicos mostrada nesta página vem diretamente
+das opções configuradas nesse campo no Trello (pela mesma ordem) — não está fixa no código; se um
+dia adicionares ou removeres um mecânico no Trello, a página segue sozinha, sem precisar de
+alteração aqui.
+
+Clicar numa barra abre "Reatribuir cartão" (escolher outro mecânico, pela pesquisa, ou "Remover
+atribuição"). O painel "Por atribuir" no topo mostra só uma contagem + botão "Ver lista" (evita
+ocupar espaço quando houver muitos cartões por atribuir ao mesmo tempo) — abre uma lista
+pesquisável, e escolher um cartão aí leva direto ao mesmo picker de mecânico.
+
+**Importante — o que esta página NUNCA altera**: a única escrita que faz num cartão do Trello é
+neste campo personalizado "Atribuído a". Nunca toca em Início, Prazo, lista, etiquetas, nome,
+descrição ou checklist — isso é uma regra explícita pedida pelo João desde o início ("sem fazer
+alteração nos cartões do Trello"), só alargada por ele próprio a este campo específico, porque é
+partilhado (visível a todos que abrem o dashboard, não só localmente num browser).
+
+Um cartão sem Prazo (raro) aparece como uma barra de um único dia, no Início; um cartão sem Início
+real usa a data de criação como aproximação, assinalado com o mesmo padrão listrado + "*" usado no
+resto do dashboard em "Dias a decorrer".
 
 ## Favicon (ícone do site na aba do browser)
 
