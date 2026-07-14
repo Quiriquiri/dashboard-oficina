@@ -233,3 +233,10 @@ th.day-head.today-col { color: var(--series-1); }
 .gantt-picker-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gantt-picker-empty { padding: 16px 4px; font-size: 12px; color: var(--text-muted); text-align: center; }
 .swatch { display: inline-block; width: 8px; height: 8px; border-radius: 2px; flex: none; }
+
+.mechanic-slots { border: 1px solid var(--grid-line); border-radius: 8px; overflow: hidden; }
+.mechanic-slot-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-size: 13px; }
+.mechanic-slot-row + .mechanic-slot-row { border-top: 1px solid var(--grid-line); }
+.mechanic-slot-label { font-weight: 600; color: var(--text-secondary); min-width: 90px; }
+.mechanic-slot-value { flex: 1; }
+.task-bar-shared { font-size: 10px; cursor: help; }

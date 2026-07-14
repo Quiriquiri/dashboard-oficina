@@ -78,14 +78,20 @@ function equipNumFromDesc(desc) {
 }
 
 // ---------------------------------------------------------------
-// Mapa de Gantt por mecânico — usa o campo personalizado "Atribuído a" (dropdown) que já
-// existe em todos os cartões de OFICINA. A lista de mecânicos vem das OPÇÕES desse campo
-// (não está codificada aqui) — se o João adicionar/remover um mecânico no Trello, a página
-// segue automaticamente, sem precisar de alteração neste ficheiro.
+// Mapa de Gantt por mecânico — usa 2 campos personalizados (dropdown) que já existem em
+// todos os cartões de OFICINA: "Mecânico 1" e "Mecânico 2" (até 14/07/2026 era um único
+// campo "Atribuído a"; o João alterou-o para "Mecânico 1" e criou "Mecânico 2" a
+// 14/07/2026 para poder ter 2 mecânicos no mesmo serviço ao mesmo tempo). A lista de
+// mecânicos vem das OPÇÕES desses campos (não está codificada aqui) — se o João
+// adicionar/remover um mecânico no Trello, a página segue automaticamente, sem precisar
+// de alteração neste ficheiro.
 // Esta é a ÚNICA escrita que este ecrã faz num cartão do Trello: nunca toca em Início,
-// Prazo, lista, etiquetas, nome ou descrição — só este campo personalizado.
+// Prazo, lista, etiquetas, nome ou descrição — só estes 2 campos personalizados.
+// Um cartão pode ter 0 (por atribuir), 1 ou 2 mecânicos — cada um preenche um dos 2
+// campos independentemente; não há ordem/prioridade entre "Mecânico 1" e "Mecânico 2",
+// são só 2 sítios livres para até 2 nomes.
 // ---------------------------------------------------------------
-const ATRIBUIDO_A_FIELD_NAME = 'Atribuído a';
+const MECHANIC_FIELD_NAMES = ['Mecânico 1', 'Mecânico 2'];
 const GANTT_DAY_LABELS = ['2ªf', '3ªf', '4ªf', '5ªf', '6ªf', 'Sáb'];
 
 const CAT_BLUE = '#2a78d6', CAT_AQUA = '#1baf7a', CAT_YELLOW = '#eda100';
@@ -456,28 +462,44 @@ function processBoard(data, now) {
     });
   }
 
-  // Mecânico atribuído por cartão — campo personalizado "Atribuído a" (dropdown). A lista
-  // de mecânicos (id + nome de cada opção) vem diretamente das opções deste campo no board,
-  // pela ordem configurada no Trello. Um cartão sem opção escolhida fica com mechanic=null
-  // ("por atribuir"); um item cujo idValue já não corresponda a nenhuma opção viva (opção
-  // apagada no Trello entretanto) também cai em null, em vez de rebentar.
-  const atribuidoField = (data.oficinaCustomFieldDefs || [])
-    .find(f => (f.name || '').trim().toLowerCase() === ATRIBUIDO_A_FIELD_NAME.toLowerCase());
-  const mechanics = atribuidoField
-    ? (atribuidoField.options || []).slice().sort((a, b) => (a.pos || 0) - (b.pos || 0))
-        .map(o => ({ id: o.id, name: (o.value && o.value.text) || '' })).filter(m => m.name)
-    : [];
-  const mechanicNameById = {};
-  mechanics.forEach(m => { mechanicNameById[m.id] = m.name; });
-  const mechanicNameByCardId = {};
-  if (atribuidoField) {
+  // Mecânico(s) atribuído(s) por cartão — 2 campos personalizados independentes
+  // "Mecânico 1" / "Mecânico 2" (dropdown), cada um podendo estar vazio ou preenchido.
+  // `mechanicFields` guarda, por campo encontrado no board (0, 1 ou 2 — degrada
+  // graciosamente se só um dos dois existir), o id do campo e o mapa id-de-opção → nome.
+  // `mechanics` (lista global usada nos pickers/linhas do Gantt) é a união dos nomes de
+  // ambos os campos, pela ordem de aparição (1º campo primeiro), sem repetir.
+  const mechanicFields = MECHANIC_FIELD_NAMES.map((fieldName, slot) => {
+    const field = (data.oficinaCustomFieldDefs || [])
+      .find(f => (f.name || '').trim().toLowerCase() === fieldName.toLowerCase());
+    if (!field) return null;
+    const optionNameById = {};
+    const options = (field.options || []).slice().sort((a, b) => (a.pos || 0) - (b.pos || 0))
+      .map(o => ({ id: o.id, name: (o.value && o.value.text) || '' })).filter(o => o.name);
+    options.forEach(o => { optionNameById[o.id] = o.name; });
+    return { slot, fieldName, id: field.id, options, optionNameById };
+  }).filter(Boolean);
+
+  const mechanics = [];
+  const mechanicsSeen = {};
+  mechanicFields.forEach(f => f.options.forEach(o => {
+    if (mechanicsSeen[o.name]) return;
+    mechanicsSeen[o.name] = true;
+    mechanics.push({ id: o.id, name: o.name });
+  }));
+
+  // Por cartão: um valor por slot (null se esse campo estiver vazio nesse cartão), mais a
+  // lista já sem vazios (`mechanics`) usada para agrupar no Gantt e decidir "por atribuir".
+  const mechanicSlotsByCardId = {};
+  mechanicFields.forEach(field => {
     (data.oficinaCardCustomFieldItems || []).forEach(c => {
       (c.customFieldItems || []).forEach(item => {
-        if (item.idCustomField !== atribuidoField.id) return;
-        if (item.idValue && mechanicNameById[item.idValue]) mechanicNameByCardId[c.id] = mechanicNameById[item.idValue];
+        if (item.idCustomField !== field.id) return;
+        if (!item.idValue || !field.optionNameById[item.idValue]) return;
+        const slots = mechanicSlotsByCardId[c.id] = mechanicSlotsByCardId[c.id] || [null, null];
+        slots[field.slot] = field.optionNameById[item.idValue];
       });
     });
-  }
+  });
 
   // Pedidos de material (quadro "Pedidos Peças") agrupados por nº de equipamento, extraído
   // do texto da descrição ("Nº Equipamento: 4039"). Só cartões ativos (não arquivados).
@@ -554,10 +576,11 @@ function processBoard(data, now) {
   ganttSourceCards.forEach(c => {
     if (ganttCardsSeen[c.trelloId]) return; // cada cartão só está numa lista, mas por segurança
     ganttCardsSeen[c.trelloId] = true;
+    const mechanicSlots = mechanicSlotsByCardId[c.trelloId] || [null, null];
     ganttCards.push({
       trelloId: c.trelloId, id: c.id, name: c.name, url: c.url,
       start: c.start, due: c.due, created: c.created, equipNum: c.equipNum,
-      mechanic: mechanicNameByCardId[c.trelloId] || null,
+      mechanicSlots, mechanics: mechanicSlots.filter(Boolean),
     });
   });
 
@@ -620,7 +643,7 @@ function processBoard(data, now) {
     boardName: data.name,
     decorrerExterno, metalomecanica, planeamentoInterno, workshops, pedreiras, faltaDePecas, boardLabels,
     boardMembers, allLists, cardsById, pedidosList,
-    ganttCards, mechanics, atribuidoFieldId: atribuidoField ? atribuidoField.id : null,
+    ganttCards, mechanics, mechanicFields,
     resolution: { count: durations.length, mean, median, p90, monthlyAvgLast14 },
     totals: {
       totalOpen: cards.filter(c => !c.closed).length,
@@ -1027,14 +1050,16 @@ function wireCardEditing(root, P) {
 
 // ---------------------------------------------------------------
 // Mapa de Gantt por mecânico — página "Gantt Mecânicos" (P.ganttCards / P.mechanics /
-// P.atribuidoFieldId, ver processBoard). Um mecânico por linha (com sub-linhas se tiver
+// P.mechanicFields, ver processBoard). Um mecânico por linha (com sub-linhas se tiver
 // vários serviços em simultâneo); cada barra é um cartão do Trello, posicionado pelo
-// Início/Prazo reais. A ÚNICA escrita que este ecrã faz num cartão é no campo
-// personalizado "Atribuído a" (saveCardMechanic, definido acima) — nunca em Início,
-// Prazo, lista, etiquetas, nome ou descrição. Estado de navegação (semanas visíveis /
-// semana âncora) fica guardado a nível de módulo para não se perder sempre que os dados
-// são atualizados (ex.: depois de atribuir um cartão, que força um re-render completo
-// desta página a partir da cache — ver rerenderFromCache).
+// Início/Prazo reais. Um serviço pode ter até 2 mecânicos ao mesmo tempo (pedido pelo
+// João a 14/07/2026) — nesse caso a MESMA barra aparece na linha de cada um dos 2. A
+// ÚNICA escrita que este ecrã faz num cartão é nos campos personalizados "Mecânico 1" /
+// "Mecânico 2" (saveCardMechanic, definido acima) — nunca em Início, Prazo, lista,
+// etiquetas, nome ou descrição. Estado de navegação (semanas visíveis / semana âncora)
+// fica guardado a nível de módulo para não se perder sempre que os dados são
+// atualizados (ex.: depois de atribuir um cartão, que força um re-render completo desta
+// página a partir da cache — ver rerenderFromCache).
 // ---------------------------------------------------------------
 let ganttWeeksToShow = null;
 let ganttAnchorMonday = null;
@@ -1100,99 +1125,102 @@ function ganttPackLanes(spans) {
   return lanes.map(l => l.items);
 }
 
-function ganttMechanicOptionId(P, name) {
-  const m = (P.mechanics || []).find(x => x.name === name);
-  return m ? m.id : null;
-}
-
-// Lista pesquisável de mecânicos partilhada pelos dois pickers (atribuir / reatribuir).
-// Devolve a própria função de desenho, para o campo de pesquisa poder chamá-la de novo.
-function ganttMechanicPickerList(listEl, P, currentName, onPick) {
-  function draw(filter) {
-    const f = (filter || '').toLowerCase();
-    const items = (P.mechanics || []).filter(m => m.name.toLowerCase().includes(f));
-    listEl.innerHTML = items.length ? items.map(m => `
-      <div class="gantt-picker-item" data-name="${esc(m.name)}">
-        <span class="name">${esc(m.name)}${m.name === currentName ? ' (atual)' : ''}</span>
-      </div>`).join('') : '<div class="gantt-picker-empty">Sem mecânicos com esse nome.</div>';
-    listEl.querySelectorAll('.gantt-picker-item').forEach(it => it.addEventListener('click', () => onPick(it.dataset.name)));
-  }
-  draw('');
-  return draw;
+function ganttOptionIdForField(field, name) {
+  const o = (field.options || []).find(x => x.name === name);
+  return o ? o.id : null;
 }
 
 function ganttCloseModal() { document.getElementById('modalRoot').innerHTML = ''; }
 
-function ganttOpenAssignPicker(cardId, P) {
+// Editor único "Mecânicos deste serviço" — mostra uma linha por campo real existente no
+// board (1 ou 2, tal como P.mechanicFields), cada uma independentemente vazia ou
+// preenchida. Serve tanto para atribuir pela 1ª vez (a partir do painel "Por atribuir")
+// como para reatribuir/remover a partir de um clique numa barra — é o mesmo modal,
+// porque agora "atribuir" e "reatribuir" são só "mudar um dos 2 campos".
+function ganttOpenCardMechanicsModal(cardId, P) {
   const card = (P.ganttCards || []).find(c => c.trelloId === cardId);
   if (!card) return;
-  document.getElementById('modalRoot').innerHTML = `
-    <div class="modal-backdrop" id="ganttBackdrop">
-      <div class="modal">
-        <h3>Atribuir a um mecânico</h3>
-        <p>${esc(card.name)}</p>
-        <input type="text" id="ganttPickerSearch" placeholder="Pesquisar mecânico…" autofocus>
-        <div class="gantt-picker-list" id="ganttPickerList"></div>
-        <span class="due-status" id="ganttPickerStatus"></span>
-        <div class="row"><button id="ganttPickerCancel">Cancelar</button></div>
-        <p class="info-note">Grava logo no campo personalizado "Atribuído a" do cartão no Trello — visível para todos, não só neste browser. Não altera mais nada no cartão.</p>
-      </div>
-    </div>`;
-  const listEl = document.getElementById('ganttPickerList');
-  const statusEl = document.getElementById('ganttPickerStatus');
-  const redraw = ganttMechanicPickerList(listEl, P, null, async (name) => {
-    const idValue = ganttMechanicOptionId(P, name);
-    if (!idValue) return;
-    const ok = await saveCardMechanic(cardId, P.atribuidoFieldId, idValue, statusEl);
-    if (ok) ganttCloseModal();
-  });
-  document.getElementById('ganttPickerSearch').addEventListener('input', e => redraw(e.target.value));
-  document.getElementById('ganttPickerCancel').addEventListener('click', ganttCloseModal);
-  document.getElementById('ganttBackdrop').addEventListener('click', e => { if (e.target.id === 'ganttBackdrop') ganttCloseModal(); });
-}
+  const fields = P.mechanicFields || [];
 
-function ganttOpenReassignPicker(cardId, P) {
-  const card = (P.ganttCards || []).find(c => c.trelloId === cardId);
-  if (!card) return;
-  document.getElementById('modalRoot').innerHTML = `
-    <div class="modal-backdrop" id="ganttBackdrop">
-      <div class="modal">
-        <h3>Reatribuir cartão</h3>
-        <p><a href="${esc(card.url)}" target="_blank" rel="noopener">${esc(card.name)} ↗</a><br>Atualmente: ${esc(card.mechanic || '—')}</p>
-        <input type="text" id="ganttPickerSearch" placeholder="Pesquisar mecânico…" autofocus>
-        <div class="gantt-picker-list" id="ganttPickerList"></div>
-        <span class="due-status" id="ganttPickerStatus"></span>
-        <div class="row">
-          <button class="btn-danger" id="ganttPickerUnassign">Remover atribuição</button>
-          <button id="ganttPickerCancel">Cancelar</button>
+  function draw() {
+    const rowsHtml = fields.map(field => {
+      const current = card.mechanicSlots[field.slot];
+      return `
+        <div class="mechanic-slot-row" data-slot="${field.slot}">
+          <span class="mechanic-slot-label">${esc(field.fieldName)}</span>
+          <span class="mechanic-slot-value">${current ? esc(current) : '<span class="unassigned-empty">— vazio —</span>'}</span>
+          <button type="button" class="link-btn" data-action="pick" data-slot="${field.slot}">${current ? 'Mudar' : 'Escolher'}</button>
+          ${current ? `<button type="button" class="link-btn" data-action="clear" data-slot="${field.slot}">Remover</button>` : ''}
+        </div>`;
+    }).join('');
+    document.getElementById('modalRoot').innerHTML = `
+      <div class="modal-backdrop" id="ganttBackdrop">
+        <div class="modal">
+          <h3>Mecânicos deste serviço</h3>
+          <p><a href="${esc(card.url)}" target="_blank" rel="noopener">${esc(card.name)} ↗</a></p>
+          <div class="mechanic-slots">${rowsHtml}</div>
+          <div id="ganttSlotPicker"></div>
+          <span class="due-status" id="ganttPickerStatus"></span>
+          <div class="row"><button id="ganttPickerCancel">Fechar</button></div>
+          <p class="info-note">Cada linha acima grava só no respetivo campo personalizado (${fields.map(f => `"${esc(f.fieldName)}"`).join(' / ')}) do cartão no Trello — visível para todos, não só neste browser. Não altera Início, Prazo, lista, etiquetas, nome ou descrição.</p>
         </div>
-        <p class="info-note">Muda só o campo "Atribuído a" — Início, Prazo, lista, etiquetas e tudo o resto deste cartão ficam exatamente como estavam.</p>
-      </div>
-    </div>`;
-  const listEl = document.getElementById('ganttPickerList');
-  const statusEl = document.getElementById('ganttPickerStatus');
-  const redraw = ganttMechanicPickerList(listEl, P, card.mechanic, async (name) => {
-    const idValue = ganttMechanicOptionId(P, name);
-    if (!idValue) return;
-    const ok = await saveCardMechanic(cardId, P.atribuidoFieldId, idValue, statusEl);
-    if (ok) ganttCloseModal();
-  });
-  document.getElementById('ganttPickerSearch').addEventListener('input', e => redraw(e.target.value));
-  document.getElementById('ganttPickerUnassign').addEventListener('click', async () => {
-    const ok = await saveCardMechanic(cardId, P.atribuidoFieldId, null, statusEl);
-    if (ok) ganttCloseModal();
-  });
-  document.getElementById('ganttPickerCancel').addEventListener('click', ganttCloseModal);
-  document.getElementById('ganttBackdrop').addEventListener('click', e => { if (e.target.id === 'ganttBackdrop') ganttCloseModal(); });
+      </div>`;
+    document.getElementById('ganttPickerCancel').addEventListener('click', ganttCloseModal);
+    document.getElementById('ganttBackdrop').addEventListener('click', e => { if (e.target.id === 'ganttBackdrop') ganttCloseModal(); });
+    document.querySelectorAll('.mechanic-slot-row [data-action="pick"]').forEach(btn => {
+      btn.addEventListener('click', () => openSlotPicker(parseInt(btn.dataset.slot, 10)));
+    });
+    document.querySelectorAll('.mechanic-slot-row [data-action="clear"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const slot = parseInt(btn.dataset.slot, 10);
+        const field = fields.find(f => f.slot === slot);
+        const statusEl = document.getElementById('ganttPickerStatus');
+        const ok = await saveCardMechanic(cardId, field.id, null, statusEl);
+        if (ok) { card.mechanicSlots[slot] = null; card.mechanics = card.mechanicSlots.filter(Boolean); draw(); }
+      });
+    });
+  }
+
+  // Uma pessoa não conta como "2 mecânicos" no mesmo serviço — por isso o nome já
+  // escolhido noutro campo não aparece na lista de opções deste.
+  function openSlotPicker(slot) {
+    const field = fields.find(f => f.slot === slot);
+    if (!field) return;
+    const otherSlotNames = fields.filter(f => f.slot !== slot).map(f => card.mechanicSlots[f.slot]).filter(Boolean);
+    const pickerEl = document.getElementById('ganttSlotPicker');
+    pickerEl.innerHTML = `
+      <input type="text" id="ganttPickerSearch" placeholder="Pesquisar mecânico para ${esc(field.fieldName)}…" autofocus>
+      <div class="gantt-picker-list" id="ganttPickerList"></div>`;
+    const listEl = document.getElementById('ganttPickerList');
+    function drawList(filter) {
+      const f = (filter || '').toLowerCase();
+      const items = field.options.filter(o => o.name.toLowerCase().includes(f) && !otherSlotNames.includes(o.name));
+      listEl.innerHTML = items.length ? items.map(o => `
+        <div class="gantt-picker-item" data-name="${esc(o.name)}">
+          <span class="name">${esc(o.name)}${o.name === card.mechanicSlots[slot] ? ' (atual)' : ''}</span>
+        </div>`).join('') : '<div class="gantt-picker-empty">Sem mecânicos com esse nome.</div>';
+      listEl.querySelectorAll('.gantt-picker-item').forEach(it => it.addEventListener('click', async () => {
+        const idValue = ganttOptionIdForField(field, it.dataset.name);
+        if (!idValue) return;
+        const statusEl = document.getElementById('ganttPickerStatus');
+        const ok = await saveCardMechanic(cardId, field.id, idValue, statusEl);
+        if (ok) { card.mechanicSlots[slot] = it.dataset.name; card.mechanics = card.mechanicSlots.filter(Boolean); draw(); }
+      }));
+    }
+    drawList('');
+    document.getElementById('ganttPickerSearch').addEventListener('input', e => drawList(e.target.value));
+  }
+
+  draw();
 }
 
 function ganttOpenUnassignedPopover(P) {
-  const total = (P.ganttCards || []).filter(c => !c.mechanic).length;
+  const total = (P.ganttCards || []).filter(c => !c.mechanics || !c.mechanics.length).length;
   document.getElementById('modalRoot').innerHTML = `
     <div class="modal-backdrop" id="ganttBackdrop">
       <div class="modal">
         <h3>Cartões por atribuir</h3>
-        <p>${total} cartõe${total === 1 ? '' : 's'} sem mecânico no campo "Atribuído a"</p>
+        <p>${total} cartõe${total === 1 ? '' : 's'} sem mecânico atribuído</p>
         <input type="text" id="ganttPickerSearch" placeholder="Pesquisar cartão…" autofocus>
         <div class="gantt-picker-list" id="ganttPickerList"></div>
         <div class="row"><button id="ganttPickerCancel">Fechar</button></div>
@@ -1200,7 +1228,7 @@ function ganttOpenUnassignedPopover(P) {
     </div>`;
   function draw(filter) {
     const f = (filter || '').toLowerCase();
-    const items = (P.ganttCards || []).filter(c => !c.mechanic && c.name.toLowerCase().includes(f));
+    const items = (P.ganttCards || []).filter(c => (!c.mechanics || !c.mechanics.length) && c.name.toLowerCase().includes(f));
     const listEl = document.getElementById('ganttPickerList');
     listEl.innerHTML = items.length ? items.map(c => `
       <div class="gantt-picker-item" data-id="${esc(c.trelloId)}">
@@ -1210,7 +1238,7 @@ function ganttOpenUnassignedPopover(P) {
     listEl.querySelectorAll('.gantt-picker-item').forEach(it => it.addEventListener('click', () => {
       const cardId = it.dataset.id;
       ganttCloseModal();
-      ganttOpenAssignPicker(cardId, P);
+      ganttOpenCardMechanicsModal(cardId, P);
     }));
   }
   draw('');
@@ -1239,8 +1267,12 @@ function ganttTableHtml(P, now) {
   });
   dayRow += '</tr>';
 
+  // Um cartão com 2 mecânicos entra no bucket de CADA UM — a mesma barra acaba por
+  // aparecer nas 2 linhas, uma vez em cada mecânico, com as mesmas datas e cor.
   const cardsByMechanic = {};
-  (P.ganttCards || []).forEach(c => { if (c.mechanic) (cardsByMechanic[c.mechanic] = cardsByMechanic[c.mechanic] || []).push(c); });
+  (P.ganttCards || []).forEach(c => {
+    (c.mechanics || []).forEach(name => { (cardsByMechanic[name] = cardsByMechanic[name] || []).push(c); });
+  });
 
   let body = '';
   (P.mechanics || []).forEach(mech => {
@@ -1276,8 +1308,10 @@ function ganttTableHtml(P, now) {
           if (sameAsPrev) barCls += ' merge-left';
           if (sameAsNext) barCls += ' merge-right';
           if (item.approxStart) barCls += ' approx';
-          const title = `${item.card.name} (${item.start}${item.approxStart ? '*' : ''} → ${item.due})`;
-          inner = `<span class="${barCls}" style="background:${ganttColorForCard(item.card)}" data-id="${esc(item.card.trelloId)}" title="${esc(title)}">${sameAsPrev ? '' : esc(item.card.name)}</span>`;
+          const others = (item.card.mechanics || []).filter(n => n !== mech.name);
+          const title = `${item.card.name} (${item.start}${item.approxStart ? '*' : ''} → ${item.due})${others.length ? ' · com ' + others.join(', ') : ''}`;
+          const twoUp = others.length ? ' <span class="task-bar-shared" title="Também com ' + esc(others.join(', ')) + '">👥</span>' : '';
+          inner = `<span class="${barCls}" style="background:${ganttColorForCard(item.card)}" data-id="${esc(item.card.trelloId)}" title="${esc(title)}">${sameAsPrev ? '' : esc(item.card.name) + twoUp}</span>`;
         }
         body += `<td class="${cls}">${inner}</td>`;
       });
@@ -1296,20 +1330,20 @@ function renderGanttContent(P, now) {
   if (ganttAnchorMonday === null) ganttAnchorMonday = ganttStartOfWeek(now);
 
   const contentEl = document.getElementById('content');
-  if (!P.atribuidoFieldId) {
-    contentEl.innerHTML = `<div class="empty-state">Não encontrei o campo personalizado "Atribuído a" neste board (ou ainda não foi possível ir buscá-lo). Confirma que o nome do campo no Trello é exatamente "Atribuído a" — sem isso, este mapa não consegue ler nem gravar a atribuição por mecânico.</div>`;
+  if (!P.mechanicFields || !P.mechanicFields.length) {
+    contentEl.innerHTML = `<div class="empty-state">Não encontrei nenhum dos campos personalizados "Mecânico 1" / "Mecânico 2" neste board (ou ainda não foi possível ir buscá-los). Confirma que os nomes no Trello são exatamente esses — sem isso, este mapa não consegue ler nem gravar a atribuição por mecânico.</div>`;
     return;
   }
 
-  const unassignedCount = (P.ganttCards || []).filter(c => !c.mechanic).length;
+  const unassignedCount = (P.ganttCards || []).filter(c => !c.mechanics || !c.mechanics.length).length;
   const unassignedHtml = unassignedCount
-    ? `<span class="unassigned-count">${unassignedCount}</span> cartõe${unassignedCount === 1 ? '' : 's'} sem mecânico no campo "Atribuído a" <button class="link-btn" id="btnOpenUnassigned">Ver lista</button>`
+    ? `<span class="unassigned-count">${unassignedCount}</span> cartõe${unassignedCount === 1 ? '' : 's'} sem mecânico atribuído <button class="link-btn" id="btnOpenUnassigned">Ver lista</button>`
     : `<span class="unassigned-empty">Sem cartões por atribuir de momento.</span>`;
 
   contentEl.innerHTML = `
     <section class="card">
       <h2>Mapa de Gantt — Mecânicos</h2>
-      <p class="desc">Um mecânico por linha (com sub-linhas se tiver vários serviços em simultâneo); cada barra é um cartão do Trello, posicionado pelo Início/Prazo reais · cartões de A Decorrer Externo/Interno, Metalomecânica, Pedreiras e Planeamento Interno (Falta de Peças fica fora) · cor da barra = por nº de equipamento · clicar numa barra deixa reatribuir o cartão a outro mecânico, grava só no campo "Atribuído a", nada mais no cartão muda</p>
+      <p class="desc">Um mecânico por linha (com sub-linhas se tiver vários serviços em simultâneo); cada barra é um cartão do Trello, posicionado pelo Início/Prazo reais · cartões de A Decorrer Externo/Interno, Metalomecânica, Pedreiras e Planeamento Interno (Falta de Peças fica fora) · cor da barra = por nº de equipamento · um serviço pode ter até 2 mecânicos ao mesmo tempo (a mesma barra aparece nas 2 linhas, com o ícone 👥) · clicar numa barra abre "Mecânicos deste serviço", grava só nos campos "Mecânico 1"/"Mecânico 2", nada mais no cartão muda</p>
       <div class="gantt-controls">
         <label style="font-size:12px; color:var(--text-secondary);">Semanas visíveis:
           <select id="ganttWeeksSelect">
@@ -1328,7 +1362,7 @@ function renderGanttContent(P, now) {
       <div class="gantt-scroll">
         <table class="gantt" id="ganttTable">${ganttTableHtml(P, now)}</table>
       </div>
-      <p class="info-note" style="margin-top:14px;">As barras vêm do Início/Prazo reais de cada cartão (padrão listrado = falta data de Início real, tal como o "*" usado no resto do dashboard; um cartão sem Prazo aparece como um único dia, no Início). Reatribuir um cartão a outro mecânico muda só o campo "Atribuído a" — datas, lista, etiquetas e tudo o resto do cartão ficam exatamente como estavam.</p>
+      <p class="info-note" style="margin-top:14px;">As barras vêm do Início/Prazo reais de cada cartão (padrão listrado = falta data de Início real, tal como o "*" usado no resto do dashboard; um cartão sem Prazo aparece como um único dia, no Início). Mudar os mecânicos de um serviço muda só os campos "Mecânico 1"/"Mecânico 2" — datas, lista, etiquetas e tudo o resto do cartão ficam exatamente como estavam.</p>
     </section>`;
 
   document.getElementById('ganttWeeksSelect').addEventListener('change', e => { ganttWeeksToShow = parseInt(e.target.value, 10); renderGanttContent(P, now); });
@@ -1338,7 +1372,7 @@ function renderGanttContent(P, now) {
   const btnUnassigned = document.getElementById('btnOpenUnassigned');
   if (btnUnassigned) btnUnassigned.addEventListener('click', () => ganttOpenUnassignedPopover(P));
   document.getElementById('ganttTable').querySelectorAll('.task-bar').forEach(bar => {
-    bar.addEventListener('click', () => ganttOpenReassignPicker(bar.dataset.id, P));
+    bar.addEventListener('click', () => ganttOpenCardMechanicsModal(bar.dataset.id, P));
   });
 }
 
