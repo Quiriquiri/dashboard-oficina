@@ -468,9 +468,14 @@ function processBoard(data, now) {
   // graciosamente se só um dos dois existir), o id do campo e o mapa id-de-opção → nome.
   // `mechanics` (lista global usada nos pickers/linhas do Gantt) é a união dos nomes de
   // ambos os campos, pela ordem de aparição (1º campo primeiro), sem repetir.
+  // Nota: no Trello os campos chamam-se "Mecânico 1:" / "Mecânico 2:" (com dois pontos no
+  // fim) — a comparação abaixo ignora dois-pontos/espaços à volta do nome para não depender
+  // de o João ter posto ou não esse ":" (se um dia o remover ou ajustar, continua a
+  // encontrar o campo na mesma).
+  const normalizeFieldName = s => (s || '').trim().toLowerCase().replace(/:+\s*$/, '');
   const mechanicFields = MECHANIC_FIELD_NAMES.map((fieldName, slot) => {
     const field = (data.oficinaCustomFieldDefs || [])
-      .find(f => (f.name || '').trim().toLowerCase() === fieldName.toLowerCase());
+      .find(f => normalizeFieldName(f.name) === normalizeFieldName(fieldName));
     if (!field) return null;
     const optionNameById = {};
     const options = (field.options || []).slice().sort((a, b) => (a.pos || 0) - (b.pos || 0))
@@ -767,10 +772,12 @@ async function saveCardField(trelloId, putFields, statusEl, cachePatch) {
 }
 
 // ---------------------------------------------------------------
-// Escrita do campo personalizado "Atribuído a" (mecânico), usada só pelo Gantt de
-// mecânicos. Campos personalizados NÃO vivem em data.cards (tal como os checklists) —
-// por isso tem o seu próprio par patch-de-cache + gravação, à parte de saveCardField.
-// Endpoint próprio do Trello para valores de campo personalizado (dropdown):
+// Escrita dos campos personalizados "Mecânico 1" / "Mecânico 2", usada só pelo Gantt de
+// mecânicos (genérica por campo — o mesmo par de funções serve para qualquer um dos 2,
+// bastando passar o customFieldId certo). Campos personalizados NÃO vivem em data.cards
+// (tal como os checklists) — por isso têm o seu próprio par patch-de-cache + gravação, à
+// parte de saveCardField. Endpoint próprio do Trello para valores de campo personalizado
+// (dropdown):
 //   PUT  /1/card/{id}/customField/{fieldId}/item   body {"idValue": "<id da opção>"}
 //   DELETE /1/card/{id}/customField/{fieldId}/item  (para remover a atribuição)
 // Nunca toca em mais nenhum campo do cartão.
@@ -1331,7 +1338,7 @@ function renderGanttContent(P, now) {
 
   const contentEl = document.getElementById('content');
   if (!P.mechanicFields || !P.mechanicFields.length) {
-    contentEl.innerHTML = `<div class="empty-state">Não encontrei nenhum dos campos personalizados "Mecânico 1" / "Mecânico 2" neste board (ou ainda não foi possível ir buscá-los). Confirma que os nomes no Trello são exatamente esses — sem isso, este mapa não consegue ler nem gravar a atribuição por mecânico.</div>`;
+    contentEl.innerHTML = `<div class="empty-state">Não encontrei nenhum dos campos personalizados "Mecânico 1" / "Mecânico 2" neste board (ou ainda não foi possível ir buscá-los). Confirma que os nomes no Trello começam por "Mecânico 1" e "Mecânico 2" (o ":" no fim, se existir, não é problema) — sem isso, este mapa não consegue ler nem gravar a atribuição por mecânico.</div>`;
     return;
   }
 

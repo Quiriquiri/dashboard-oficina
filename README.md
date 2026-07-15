@@ -184,22 +184,29 @@ aparecer normalmente através da lista onde realmente está.
 preenchido, senão o primeiro número de 3 a 6 dígitos encontrado no nome do cartão) — o mesmo
 equipamento fica sempre com a mesma cor em qualquer lado do mapa, sem precisar de legenda.
 
-**Mecânico atribuído**: lê e escreve o campo personalizado **"Atribuído a"** (dropdown) que já
-existe em todos os cartões de OFICINA. A lista de mecânicos mostrada nesta página vem diretamente
-das opções configuradas nesse campo no Trello (pela mesma ordem) — não está fixa no código; se um
-dia adicionares ou removeres um mecânico no Trello, a página segue sozinha, sem precisar de
+**Mecânico(s) atribuído(s)**: lê e escreve 2 campos personalizados independentes, **"Mecânico 1"**
+e **"Mecânico 2"** (dropdown), que já existem em todos os cartões de OFICINA — um serviço pode ter
+0 (por atribuir), 1 ou 2 mecânicos ao mesmo tempo (pedido pelo João a 14/07/2026). Quando um
+serviço tem 2 mecânicos, a mesma barra aparece nas linhas dos 2, com um ícone 👥 a indicar que é
+partilhado (passar o rato mostra o nome do outro mecânico). A lista de mecânicos mostrada nesta
+página vem diretamente das opções configuradas nesses campos no Trello — não está fixa no código;
+se um dia adicionares ou removeres um mecânico no Trello, a página segue sozinha, sem precisar de
 alteração aqui.
 
-Clicar numa barra abre "Reatribuir cartão" (escolher outro mecânico, pela pesquisa, ou "Remover
-atribuição"). O painel "Por atribuir" no topo mostra só uma contagem + botão "Ver lista" (evita
-ocupar espaço quando houver muitos cartões por atribuir ao mesmo tempo) — abre uma lista
-pesquisável, e escolher um cartão aí leva direto ao mesmo picker de mecânico.
+Clicar numa barra (ou num cartão na lista "Por atribuir") abre "Mecânicos deste serviço": uma linha
+por campo ("Mecânico 1" / "Mecânico 2"), cada uma podendo estar vazia ou preenchida, com um botão
+"Escolher"/"Mudar" (abre uma pesquisa) e "Remover" quando já tem alguém. A mesma pessoa não aparece
+como opção nas duas linhas ao mesmo tempo (não faz sentido contar como "2 mecânicos" sendo a mesma
+pessoa). O painel "Por atribuir" no topo mostra só uma contagem + botão "Ver lista" (evita ocupar
+espaço quando houver muitos cartões por atribuir ao mesmo tempo) — abre uma lista pesquisável, e
+escolher um cartão aí leva direto ao mesmo editor de mecânicos.
 
 **Importante — o que esta página NUNCA altera**: a única escrita que faz num cartão do Trello é
-neste campo personalizado "Atribuído a". Nunca toca em Início, Prazo, lista, etiquetas, nome,
-descrição ou checklist — isso é uma regra explícita pedida pelo João desde o início ("sem fazer
-alteração nos cartões do Trello"), só alargada por ele próprio a este campo específico, porque é
-partilhado (visível a todos que abrem o dashboard, não só localmente num browser).
+nestes 2 campos personalizados ("Mecânico 1" / "Mecânico 2"). Nunca toca em Início, Prazo, lista,
+etiquetas, nome, descrição ou checklist — isso é uma regra explícita pedida pelo João desde o
+início ("sem fazer alteração nos cartões do Trello"), só alargada por ele próprio a estes campos
+específicos, porque são partilhados (visíveis a todos que abrem o dashboard, não só localmente num
+browser).
 
 Um cartão sem Prazo (raro) aparece como uma barra de um único dia, no Início; um cartão sem Início
 real usa a data de criação como aproximação, assinalado com o mesmo padrão listrado + "*" usado no
